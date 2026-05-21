@@ -1,0 +1,429 @@
+﻿pip_value estimasi: 9.0 (override dengan --pipval)
+
+Backtest: USDJPY | step=4 | trail=OFF
+CSV: ../data/USDJPY_GMT+0_NO-DST_M15.csv
+  139,666 candle M15 | 2020-01-01 22:00:00 s/d 2025-08-11 23:45:00
+Estimasi 34,854 iterasi sinyal. Ini mungkin butuh beberapa menit...
+
+Resampling ke H4 dan D1... H4=9,025 bars | D1=1,750 bars
+    0.9% | bar=1,458/139,666 | trades=10 | equity=$1,062.39 | ETA=20.1min
+    1.5% | bar=2,302/139,666 | trades=20 | equity=$1,099.86 | ETA=19.7min
+    2.3% | bar=3,426/139,666 | trades=30 | equity=$1,175.31 | ETA=16.5min
+    2.7% | bar=3,974/139,666 | trades=40 | equity=$1,215.89 | ETA=16.7min
+    3.0% | bar=4,466/139,666 | trades=50 | equity=$1,191.27 | ETA=16.4min
+    3.0% | bar=4,474/139,666 | trades=50 | equity=$1,191.27 | ETA=16.4min
+    3.0% | bar=4,478/139,666 | trades=50 | equity=$1,191.27 | ETA=16.4min
+    3.3% | bar=4,818/139,666 | trades=60 | equity=$1,161.72 | ETA=16.1min
+    3.8% | bar=5,586/139,666 | trades=70 | equity=$1,267.02 | ETA=15.7min
+    4.2% | bar=6,142/139,666 | trades=80 | equity=$1,327.53 | ETA=15.4min
+    4.2% | bar=6,146/139,666 | trades=80 | equity=$1,327.53 | ETA=15.4min
+    4.2% | bar=6,150/139,666 | trades=80 | equity=$1,327.53 | ETA=15.4min
+    4.2% | bar=6,170/139,666 | trades=80 | equity=$1,327.53 | ETA=15.5min
+    5.0% | bar=7,262/139,666 | trades=90 | equity=$1,308.88 | ETA=15.8min
+    5.6% | bar=8,126/139,666 | trades=100 | equity=$1,293.82 | ETA=15.9min
+    5.7% | bar=8,202/139,666 | trades=100 | equity=$1,293.82 | ETA=16.0min
+    5.7% | bar=8,206/139,666 | trades=100 | equity=$1,293.82 | ETA=16.0min
+    5.7% | bar=8,226/139,666 | trades=100 | equity=$1,293.82 | ETA=16.0min
+    6.3% | bar=9,018/139,666 | trades=110 | equity=$1,354.09 | ETA=16.2min
+    6.3% | bar=9,022/139,666 | trades=110 | equity=$1,354.09 | ETA=16.2min
+    6.3% | bar=9,026/139,666 | trades=110 | equity=$1,354.09 | ETA=16.2min
+    6.8% | bar=9,794/139,666 | trades=120 | equity=$1,374.88 | ETA=16.4min
+    7.2% | bar=10,334/139,666 | trades=130 | equity=$1,397.66 | ETA=16.4min
+    7.7% | bar=11,042/139,666 | trades=140 | equity=$1,420.69 | ETA=16.3min
+    7.7% | bar=11,046/139,666 | trades=140 | equity=$1,420.69 | ETA=16.3min
+    8.4% | bar=12,006/139,666 | trades=150 | equity=$1,475.05 | ETA=16.0min
+    9.7% | bar=13,710/139,666 | trades=160 | equity=$1,373.23 | ETA=16.1min
+   10.1% | bar=14,310/139,666 | trades=170 | equity=$1,504.69 | ETA=15.8min
+   10.1% | bar=14,318/139,666 | trades=170 | equity=$1,504.69 | ETA=15.8min
+   10.1% | bar=14,330/139,666 | trades=170 | equity=$1,504.69 | ETA=15.8min
+   10.1% | bar=14,362/139,666 | trades=170 | equity=$1,504.69 | ETA=15.8min
+   10.9% | bar=15,454/139,666 | trades=180 | equity=$1,553.21 | ETA=15.5min
+   11.4% | bar=16,178/139,666 | trades=190 | equity=$1,485.59 | ETA=15.5min
+   12.4% | bar=17,506/139,666 | trades=200 | equity=$1,504.20 | ETA=15.4min
+   12.4% | bar=17,510/139,666 | trades=200 | equity=$1,504.20 | ETA=15.4min
+   12.4% | bar=17,518/139,666 | trades=200 | equity=$1,504.20 | ETA=15.4min
+   12.4% | bar=17,594/139,666 | trades=200 | equity=$1,504.20 | ETA=15.4min
+   12.4% | bar=17,598/139,666 | trades=200 | equity=$1,504.20 | ETA=15.4min
+   12.4% | bar=17,606/139,666 | trades=200 | equity=$1,504.20 | ETA=15.4min
+   12.5% | bar=17,610/139,666 | trades=200 | equity=$1,504.20 | ETA=15.4min
+   13.1% | bar=18,550/139,666 | trades=210 | equity=$1,396.83 | ETA=15.3min
+   14.0% | bar=19,802/139,666 | trades=220 | equity=$1,331.76 | ETA=15.1min
+   14.0% | bar=19,810/139,666 | trades=220 | equity=$1,331.76 | ETA=15.1min
+   14.0% | bar=19,818/139,666 | trades=220 | equity=$1,331.76 | ETA=15.1min
+   14.0% | bar=19,826/139,666 | trades=220 | equity=$1,331.76 | ETA=15.1min
+   14.0% | bar=19,834/139,666 | trades=220 | equity=$1,331.76 | ETA=15.1min
+   15.1% | bar=21,334/139,666 | trades=230 | equity=$1,275.36 | ETA=14.7min
+   16.7% | bar=23,494/139,666 | trades=250 | equity=$1,136.47 | ETA=14.4min
+   17.3% | bar=24,354/139,666 | trades=260 | equity=$1,119.75 | ETA=14.3min
+   18.0% | bar=25,374/139,666 | trades=270 | equity=$1,133.59 | ETA=14.2min
+   19.0% | bar=26,686/139,666 | trades=280 | equity=$1,140.76 | ETA=14.0min
+   19.9% | bar=27,930/139,666 | trades=290 | equity=$1,181.48 | ETA=13.6min
+   19.9% | bar=27,934/139,666 | trades=290 | equity=$1,181.48 | ETA=13.6min
+   19.9% | bar=27,938/139,666 | trades=290 | equity=$1,181.48 | ETA=13.6min
+   20.3% | bar=28,582/139,666 | trades=300 | equity=$1,233.03 | ETA=13.5min
+   20.3% | bar=28,586/139,666 | trades=300 | equity=$1,233.03 | ETA=13.5min
+   21.0% | bar=29,518/139,666 | trades=310 | equity=$1,402.19 | ETA=13.4min
+   21.0% | bar=29,522/139,666 | trades=310 | equity=$1,402.19 | ETA=13.4min
+   21.0% | bar=29,578/139,666 | trades=310 | equity=$1,402.19 | ETA=13.4min
+   21.8% | bar=30,618/139,666 | trades=320 | equity=$1,423.65 | ETA=13.2min
+   22.3% | bar=31,294/139,666 | trades=330 | equity=$1,482.22 | ETA=13.0min
+   22.9% | bar=32,110/139,666 | trades=340 | equity=$1,539.77 | ETA=12.9min
+   22.9% | bar=32,114/139,666 | trades=340 | equity=$1,539.77 | ETA=12.9min
+   23.5% | bar=33,042/139,666 | trades=350 | equity=$1,543.98 | ETA=12.8min
+   24.4% | bar=34,334/139,666 | trades=360 | equity=$1,434.45 | ETA=12.6min
+   25.0% | bar=35,106/139,666 | trades=370 | equity=$1,485.69 | ETA=12.5min
+   25.8% | bar=36,266/139,666 | trades=380 | equity=$1,468.19 | ETA=12.4min
+   25.8% | bar=36,270/139,666 | trades=380 | equity=$1,468.19 | ETA=12.4min
+   25.8% | bar=36,274/139,666 | trades=380 | equity=$1,468.19 | ETA=12.4min
+   25.8% | bar=36,278/139,666 | trades=380 | equity=$1,468.19 | ETA=12.4min
+   25.9% | bar=36,318/139,666 | trades=380 | equity=$1,468.19 | ETA=12.4min
+   26.5% | bar=37,186/139,666 | trades=390 | equity=$1,442.62 | ETA=12.3min
+   26.5% | bar=37,190/139,666 | trades=390 | equity=$1,442.62 | ETA=12.3min
+   27.2% | bar=38,154/139,666 | trades=400 | equity=$1,413.44 | ETA=12.1min
+   27.2% | bar=38,206/139,666 | trades=400 | equity=$1,413.44 | ETA=12.1min
+   27.2% | bar=38,214/139,666 | trades=400 | equity=$1,413.44 | ETA=12.1min
+   27.2% | bar=38,218/139,666 | trades=400 | equity=$1,413.44 | ETA=12.1min
+   27.3% | bar=38,286/139,666 | trades=400 | equity=$1,413.44 | ETA=12.1min
+   27.9% | bar=39,150/139,666 | trades=410 | equity=$1,478.66 | ETA=12.0min
+   28.6% | bar=40,070/139,666 | trades=420 | equity=$1,536.32 | ETA=11.9min
+   28.6% | bar=40,074/139,666 | trades=420 | equity=$1,536.32 | ETA=11.9min
+   30.0% | bar=42,138/139,666 | trades=430 | equity=$1,665.05 | ETA=11.6min
+   30.0% | bar=42,142/139,666 | trades=430 | equity=$1,665.05 | ETA=11.6min
+   30.1% | bar=42,146/139,666 | trades=430 | equity=$1,665.05 | ETA=11.6min
+   30.1% | bar=42,154/139,666 | trades=430 | equity=$1,665.05 | ETA=11.6min
+   30.1% | bar=42,186/139,666 | trades=430 | equity=$1,665.05 | ETA=11.6min
+   30.9% | bar=43,310/139,666 | trades=440 | equity=$1,631.59 | ETA=11.5min
+   31.3% | bar=43,922/139,666 | trades=450 | equity=$1,608.32 | ETA=11.4min
+   31.3% | bar=43,950/139,666 | trades=450 | equity=$1,608.32 | ETA=11.4min
+   32.0% | bar=44,874/139,666 | trades=460 | equity=$1,670.76 | ETA=11.2min
+   32.8% | bar=45,942/139,666 | trades=470 | equity=$1,691.06 | ETA=11.1min
+   33.2% | bar=46,498/139,666 | trades=480 | equity=$1,654.88 | ETA=11.0min
+   33.7% | bar=47,238/139,666 | trades=490 | equity=$1,724.85 | ETA=10.9min
+   34.2% | bar=47,914/139,666 | trades=500 | equity=$1,650.70 | ETA=10.8min
+   34.7% | bar=48,674/139,666 | trades=510 | equity=$1,583.82 | ETA=10.7min
+   34.7% | bar=48,678/139,666 | trades=510 | equity=$1,583.82 | ETA=10.7min
+   34.8% | bar=48,746/139,666 | trades=510 | equity=$1,583.82 | ETA=10.7min
+   34.8% | bar=48,750/139,666 | trades=510 | equity=$1,583.82 | ETA=10.7min
+   35.6% | bar=49,826/139,666 | trades=520 | equity=$1,644.75 | ETA=10.6min
+   36.2% | bar=50,746/139,666 | trades=530 | equity=$1,606.38 | ETA=10.5min
+   36.7% | bar=51,474/139,666 | trades=540 | equity=$1,626.89 | ETA=10.4min
+   36.7% | bar=51,478/139,666 | trades=540 | equity=$1,626.89 | ETA=10.4min
+   36.7% | bar=51,482/139,666 | trades=540 | equity=$1,626.89 | ETA=10.4min
+   36.8% | bar=51,486/139,666 | trades=540 | equity=$1,626.89 | ETA=10.4min
+   36.8% | bar=51,518/139,666 | trades=540 | equity=$1,626.89 | ETA=10.4min
+   37.4% | bar=52,374/139,666 | trades=550 | equity=$1,748.75 | ETA=10.3min
+   38.3% | bar=53,606/139,666 | trades=560 | equity=$1,675.25 | ETA=10.1min
+   38.9% | bar=54,450/139,666 | trades=570 | equity=$1,754.26 | ETA=10.0min
+   39.3% | bar=55,062/139,666 | trades=580 | equity=$1,913.81 | ETA=9.9min
+   39.8% | bar=55,798/139,666 | trades=590 | equity=$2,025.93 | ETA=9.9min
+   40.3% | bar=56,382/139,666 | trades=600 | equity=$2,249.29 | ETA=9.8min
+   40.3% | bar=56,386/139,666 | trades=600 | equity=$2,249.29 | ETA=9.8min
+   40.3% | bar=56,398/139,666 | trades=600 | equity=$2,249.29 | ETA=9.8min
+   40.3% | bar=56,402/139,666 | trades=600 | equity=$2,249.29 | ETA=9.8min
+   40.3% | bar=56,406/139,666 | trades=600 | equity=$2,249.29 | ETA=9.8min
+   40.3% | bar=56,410/139,666 | trades=600 | equity=$2,249.29 | ETA=9.8min
+   40.8% | bar=57,098/139,666 | trades=610 | equity=$2,578.23 | ETA=9.7min
+   41.0% | bar=57,458/139,666 | trades=620 | equity=$2,399.40 | ETA=9.6min
+   41.0% | bar=57,470/139,666 | trades=620 | equity=$2,399.40 | ETA=9.6min
+   41.0% | bar=57,474/139,666 | trades=620 | equity=$2,399.40 | ETA=9.6min
+   41.1% | bar=57,518/139,666 | trades=620 | equity=$2,399.40 | ETA=9.6min
+   41.5% | bar=58,110/139,666 | trades=630 | equity=$2,447.38 | ETA=9.5min
+   41.9% | bar=58,718/139,666 | trades=640 | equity=$2,468.39 | ETA=9.4min
+   42.3% | bar=59,234/139,666 | trades=650 | equity=$2,299.12 | ETA=9.4min
+   42.3% | bar=59,242/139,666 | trades=650 | equity=$2,299.12 | ETA=9.4min
+   42.3% | bar=59,246/139,666 | trades=650 | equity=$2,299.12 | ETA=9.4min
+   42.3% | bar=59,278/139,666 | trades=650 | equity=$2,299.12 | ETA=9.4min
+   42.3% | bar=59,282/139,666 | trades=650 | equity=$2,299.12 | ETA=9.4min
+   42.3% | bar=59,286/139,666 | trades=650 | equity=$2,299.12 | ETA=9.4min
+   42.8% | bar=59,974/139,666 | trades=660 | equity=$2,315.68 | ETA=9.3min
+   43.2% | bar=60,454/139,666 | trades=670 | equity=$2,669.22 | ETA=9.2min
+   43.2% | bar=60,458/139,666 | trades=670 | equity=$2,669.22 | ETA=9.2min
+   43.2% | bar=60,494/139,666 | trades=670 | equity=$2,669.22 | ETA=9.2min
+   43.2% | bar=60,498/139,666 | trades=670 | equity=$2,669.22 | ETA=9.2min
+   43.6% | bar=60,990/139,666 | trades=680 | equity=$2,637.45 | ETA=9.2min
+   43.6% | bar=60,994/139,666 | trades=680 | equity=$2,637.45 | ETA=9.2min
+   44.4% | bar=62,086/139,666 | trades=690 | equity=$2,791.33 | ETA=9.0min
+   44.4% | bar=62,090/139,666 | trades=690 | equity=$2,791.33 | ETA=9.0min
+   44.7% | bar=62,634/139,666 | trades=700 | equity=$2,674.58 | ETA=8.9min
+   44.8% | bar=62,666/139,666 | trades=700 | equity=$2,674.58 | ETA=8.9min
+   44.8% | bar=62,670/139,666 | trades=700 | equity=$2,674.58 | ETA=8.9min
+   44.8% | bar=62,678/139,666 | trades=700 | equity=$2,674.58 | ETA=8.9min
+   44.9% | bar=62,838/139,666 | trades=700 | equity=$2,674.58 | ETA=8.9min
+   44.9% | bar=62,846/139,666 | trades=700 | equity=$2,674.58 | ETA=8.9min
+   44.9% | bar=62,870/139,666 | trades=700 | equity=$2,674.58 | ETA=8.9min
+   45.4% | bar=63,562/139,666 | trades=710 | equity=$2,641.59 | ETA=8.8min
+   45.8% | bar=64,070/139,666 | trades=720 | equity=$2,655.54 | ETA=8.7min
+   46.0% | bar=64,414/139,666 | trades=730 | equity=$2,663.74 | ETA=8.7min
+   46.0% | bar=64,418/139,666 | trades=730 | equity=$2,663.74 | ETA=8.7min
+   46.0% | bar=64,422/139,666 | trades=730 | equity=$2,663.74 | ETA=8.7min
+   46.0% | bar=64,450/139,666 | trades=730 | equity=$2,663.74 | ETA=8.7min
+   46.7% | bar=65,378/139,666 | trades=740 | equity=$2,625.83 | ETA=8.6min
+   46.7% | bar=65,386/139,666 | trades=740 | equity=$2,625.83 | ETA=8.6min
+   46.7% | bar=65,390/139,666 | trades=740 | equity=$2,625.83 | ETA=8.6min
+   46.7% | bar=65,394/139,666 | trades=740 | equity=$2,625.83 | ETA=8.6min
+   46.7% | bar=65,398/139,666 | trades=740 | equity=$2,625.83 | ETA=8.6min
+   46.7% | bar=65,414/139,666 | trades=740 | equity=$2,625.83 | ETA=8.6min
+   46.7% | bar=65,426/139,666 | trades=740 | equity=$2,625.83 | ETA=8.6min
+   46.8% | bar=65,430/139,666 | trades=740 | equity=$2,625.83 | ETA=8.6min
+   46.8% | bar=65,454/139,666 | trades=740 | equity=$2,625.83 | ETA=8.6min
+   46.8% | bar=65,458/139,666 | trades=740 | equity=$2,625.83 | ETA=8.6min
+   46.8% | bar=65,462/139,666 | trades=740 | equity=$2,625.83 | ETA=8.6min
+   46.8% | bar=65,470/139,666 | trades=740 | equity=$2,625.83 | ETA=8.6min
+   47.4% | bar=66,326/139,666 | trades=750 | equity=$2,591.89 | ETA=8.5min
+   47.4% | bar=66,338/139,666 | trades=750 | equity=$2,591.89 | ETA=8.5min
+   47.8% | bar=66,866/139,666 | trades=760 | equity=$2,754.23 | ETA=8.4min
+   48.1% | bar=67,338/139,666 | trades=770 | equity=$2,635.84 | ETA=8.3min
+   48.1% | bar=67,342/139,666 | trades=770 | equity=$2,635.84 | ETA=8.3min
+   48.2% | bar=67,390/139,666 | trades=770 | equity=$2,635.84 | ETA=8.3min
+   48.4% | bar=67,750/139,666 | trades=780 | equity=$2,674.47 | ETA=8.2min
+   48.9% | bar=68,486/139,666 | trades=790 | equity=$2,868.04 | ETA=8.2min
+   49.0% | bar=68,502/139,666 | trades=790 | equity=$2,868.04 | ETA=8.2min
+   49.0% | bar=68,562/139,666 | trades=790 | equity=$2,868.04 | ETA=8.2min
+   49.9% | bar=69,830/139,666 | trades=800 | equity=$2,917.95 | ETA=8.1min
+   50.5% | bar=70,598/139,666 | trades=810 | equity=$2,865.12 | ETA=8.0min
+   50.5% | bar=70,602/139,666 | trades=810 | equity=$2,865.12 | ETA=8.0min
+   50.5% | bar=70,606/139,666 | trades=810 | equity=$2,865.12 | ETA=8.0min
+   50.5% | bar=70,610/139,666 | trades=810 | equity=$2,865.12 | ETA=8.0min
+   50.5% | bar=70,614/139,666 | trades=810 | equity=$2,865.12 | ETA=8.0min
+   50.5% | bar=70,658/139,666 | trades=810 | equity=$2,865.12 | ETA=8.0min
+   50.5% | bar=70,662/139,666 | trades=810 | equity=$2,865.12 | ETA=8.0min
+   50.5% | bar=70,666/139,666 | trades=810 | equity=$2,865.12 | ETA=8.0min
+   50.5% | bar=70,670/139,666 | trades=810 | equity=$2,865.12 | ETA=8.0min
+   50.5% | bar=70,674/139,666 | trades=810 | equity=$2,865.12 | ETA=7.9min
+   50.5% | bar=70,678/139,666 | trades=810 | equity=$2,865.12 | ETA=7.9min
+   50.6% | bar=70,766/139,666 | trades=810 | equity=$2,865.12 | ETA=7.9min
+   50.6% | bar=70,770/139,666 | trades=810 | equity=$2,865.12 | ETA=7.9min
+   51.1% | bar=71,538/139,666 | trades=820 | equity=$2,806.30 | ETA=7.8min
+   51.1% | bar=71,542/139,666 | trades=820 | equity=$2,806.30 | ETA=7.8min
+   51.1% | bar=71,546/139,666 | trades=820 | equity=$2,806.30 | ETA=7.8min
+   51.1% | bar=71,550/139,666 | trades=820 | equity=$2,806.30 | ETA=7.8min
+   51.2% | bar=71,574/139,666 | trades=820 | equity=$2,806.30 | ETA=7.8min
+   51.8% | bar=72,530/139,666 | trades=830 | equity=$2,900.18 | ETA=7.7min
+   52.2% | bar=73,094/139,666 | trades=840 | equity=$2,762.26 | ETA=7.7min
+   53.0% | bar=74,114/139,666 | trades=850 | equity=$2,501.80 | ETA=7.5min
+   53.0% | bar=74,118/139,666 | trades=850 | equity=$2,501.80 | ETA=7.5min
+   53.0% | bar=74,122/139,666 | trades=850 | equity=$2,501.80 | ETA=7.5min
+   53.0% | bar=74,126/139,666 | trades=850 | equity=$2,501.80 | ETA=7.5min
+   53.0% | bar=74,202/139,666 | trades=850 | equity=$2,501.80 | ETA=7.5min
+   53.0% | bar=74,206/139,666 | trades=850 | equity=$2,501.80 | ETA=7.5min
+   53.0% | bar=74,210/139,666 | trades=850 | equity=$2,501.80 | ETA=7.5min
+   53.1% | bar=74,214/139,666 | trades=850 | equity=$2,501.80 | ETA=7.5min
+   53.1% | bar=74,246/139,666 | trades=850 | equity=$2,501.80 | ETA=7.5min
+   53.5% | bar=74,794/139,666 | trades=860 | equity=$2,512.91 | ETA=7.4min
+   53.9% | bar=75,450/139,666 | trades=870 | equity=$2,724.61 | ETA=7.3min
+   54.7% | bar=76,462/139,666 | trades=880 | equity=$2,766.15 | ETA=7.2min
+   55.1% | bar=77,022/139,666 | trades=890 | equity=$2,785.75 | ETA=7.1min
+   55.1% | bar=77,026/139,666 | trades=890 | equity=$2,785.75 | ETA=7.1min
+   55.1% | bar=77,030/139,666 | trades=890 | equity=$2,785.75 | ETA=7.1min
+   55.5% | bar=77,658/139,666 | trades=900 | equity=$2,921.40 | ETA=7.1min
+   56.2% | bar=78,622/139,666 | trades=910 | equity=$2,854.21 | ETA=7.0min
+   56.7% | bar=79,338/139,666 | trades=920 | equity=$2,826.51 | ETA=6.9min
+   56.7% | bar=79,366/139,666 | trades=920 | equity=$2,826.51 | ETA=6.9min
+   56.8% | bar=79,370/139,666 | trades=920 | equity=$2,826.51 | ETA=6.9min
+   56.8% | bar=79,374/139,666 | trades=920 | equity=$2,826.51 | ETA=6.9min
+   57.2% | bar=80,030/139,666 | trades=930 | equity=$2,924.07 | ETA=6.8min
+   57.5% | bar=80,402/139,666 | trades=940 | equity=$2,926.32 | ETA=6.8min
+   57.9% | bar=80,970/139,666 | trades=950 | equity=$3,005.56 | ETA=6.7min
+   57.9% | bar=80,986/139,666 | trades=950 | equity=$3,005.56 | ETA=6.7min
+   58.0% | bar=81,062/139,666 | trades=950 | equity=$3,005.56 | ETA=6.7min
+   58.2% | bar=81,402/139,666 | trades=960 | equity=$2,885.47 | ETA=6.6min
+   58.2% | bar=81,406/139,666 | trades=960 | equity=$2,885.47 | ETA=6.6min
+   58.2% | bar=81,410/139,666 | trades=960 | equity=$2,885.47 | ETA=6.6min
+   58.2% | bar=81,414/139,666 | trades=960 | equity=$2,885.47 | ETA=6.6min
+   58.2% | bar=81,426/139,666 | trades=960 | equity=$2,885.47 | ETA=6.6min
+   58.7% | bar=82,046/139,666 | trades=970 | equity=$2,985.80 | ETA=6.6min
+   58.7% | bar=82,050/139,666 | trades=970 | equity=$2,985.80 | ETA=6.6min
+   58.7% | bar=82,054/139,666 | trades=970 | equity=$2,985.80 | ETA=6.6min
+   58.7% | bar=82,058/139,666 | trades=970 | equity=$2,985.80 | ETA=6.6min
+   59.0% | bar=82,486/139,666 | trades=980 | equity=$2,783.77 | ETA=6.5min
+   59.0% | bar=82,490/139,666 | trades=980 | equity=$2,783.77 | ETA=6.5min
+   59.9% | bar=83,782/139,666 | trades=990 | equity=$3,010.51 | ETA=6.3min
+   59.9% | bar=83,786/139,666 | trades=990 | equity=$3,010.51 | ETA=6.3min
+   59.9% | bar=83,790/139,666 | trades=990 | equity=$3,010.51 | ETA=6.3min
+   60.3% | bar=84,274/139,666 | trades=1000 | equity=$3,140.35 | ETA=6.3min
+   61.0% | bar=85,278/139,666 | trades=1010 | equity=$3,006.71 | ETA=6.1min
+   61.5% | bar=85,974/139,666 | trades=1020 | equity=$2,936.86 | ETA=6.0min
+   61.5% | bar=85,978/139,666 | trades=1020 | equity=$2,936.86 | ETA=6.0min
+   61.5% | bar=85,982/139,666 | trades=1020 | equity=$2,936.86 | ETA=6.0min
+   61.9% | bar=86,554/139,666 | trades=1030 | equity=$2,890.54 | ETA=6.0min
+   61.9% | bar=86,558/139,666 | trades=1030 | equity=$2,890.54 | ETA=6.0min
+   62.6% | bar=87,546/139,666 | trades=1040 | equity=$3,016.83 | ETA=5.9min
+   62.6% | bar=87,562/139,666 | trades=1040 | equity=$3,016.83 | ETA=5.9min
+   62.9% | bar=88,010/139,666 | trades=1050 | equity=$3,296.33 | ETA=5.8min
+   63.2% | bar=88,362/139,666 | trades=1060 | equity=$3,245.16 | ETA=5.8min
+   63.2% | bar=88,366/139,666 | trades=1060 | equity=$3,245.16 | ETA=5.8min
+   63.2% | bar=88,370/139,666 | trades=1060 | equity=$3,245.16 | ETA=5.8min
+   63.6% | bar=88,850/139,666 | trades=1070 | equity=$2,935.71 | ETA=5.7min
+   63.6% | bar=88,854/139,666 | trades=1070 | equity=$2,935.71 | ETA=5.7min
+   63.6% | bar=88,862/139,666 | trades=1070 | equity=$2,935.71 | ETA=5.7min
+   63.6% | bar=88,878/139,666 | trades=1070 | equity=$2,935.71 | ETA=5.7min
+   63.6% | bar=88,882/139,666 | trades=1070 | equity=$2,935.71 | ETA=5.7min
+   63.6% | bar=88,886/139,666 | trades=1070 | equity=$2,935.71 | ETA=5.7min
+   63.6% | bar=88,894/139,666 | trades=1070 | equity=$2,935.71 | ETA=5.7min
+   63.6% | bar=88,906/139,666 | trades=1070 | equity=$2,935.71 | ETA=5.7min
+   64.2% | bar=89,806/139,666 | trades=1080 | equity=$3,061.58 | ETA=5.6min
+   64.2% | bar=89,814/139,666 | trades=1080 | equity=$3,061.58 | ETA=5.6min
+   64.2% | bar=89,818/139,666 | trades=1080 | equity=$3,061.58 | ETA=5.6min
+   65.1% | bar=91,062/139,666 | trades=1090 | equity=$3,109.49 | ETA=5.5min
+   65.7% | bar=91,910/139,666 | trades=1100 | equity=$3,219.67 | ETA=5.4min
+   66.5% | bar=92,930/139,666 | trades=1110 | equity=$3,547.47 | ETA=5.3min
+   67.2% | bar=93,986/139,666 | trades=1120 | equity=$3,713.17 | ETA=5.1min
+   68.0% | bar=95,118/139,666 | trades=1130 | equity=$3,660.80 | ETA=5.0min
+   68.6% | bar=95,906/139,666 | trades=1140 | equity=$3,874.62 | ETA=4.9min
+   69.3% | bar=96,814/139,666 | trades=1150 | equity=$4,131.80 | ETA=4.8min
+   69.7% | bar=97,354/139,666 | trades=1160 | equity=$4,087.92 | ETA=4.8min
+   70.1% | bar=98,006/139,666 | trades=1170 | equity=$4,138.77 | ETA=4.7min
+   70.1% | bar=98,010/139,666 | trades=1170 | equity=$4,138.77 | ETA=4.7min
+   70.6% | bar=98,662/139,666 | trades=1180 | equity=$4,379.99 | ETA=4.6min
+   71.1% | bar=99,438/139,666 | trades=1190 | equity=$4,433.75 | ETA=4.5min
+   71.1% | bar=99,442/139,666 | trades=1190 | equity=$4,433.75 | ETA=4.5min
+   71.5% | bar=99,974/139,666 | trades=1200 | equity=$4,841.65 | ETA=4.4min
+   71.5% | bar=99,978/139,666 | trades=1200 | equity=$4,841.65 | ETA=4.4min
+   71.5% | bar=99,982/139,666 | trades=1200 | equity=$4,841.65 | ETA=4.4min
+   72.0% | bar=100,594/139,666 | trades=1210 | equity=$5,064.64 | ETA=4.4min
+   72.0% | bar=100,606/139,666 | trades=1210 | equity=$5,064.64 | ETA=4.4min
+   72.0% | bar=100,610/139,666 | trades=1210 | equity=$5,064.64 | ETA=4.4min
+   72.0% | bar=100,634/139,666 | trades=1210 | equity=$5,064.64 | ETA=4.4min
+   72.3% | bar=100,982/139,666 | trades=1220 | equity=$5,479.07 | ETA=4.3min
+   72.8% | bar=101,690/139,666 | trades=1230 | equity=$5,736.80 | ETA=4.3min
+   73.2% | bar=102,350/139,666 | trades=1240 | equity=$5,486.14 | ETA=4.2min
+   73.2% | bar=102,358/139,666 | trades=1240 | equity=$5,486.14 | ETA=4.2min
+   73.2% | bar=102,366/139,666 | trades=1240 | equity=$5,486.14 | ETA=4.2min
+   73.3% | bar=102,374/139,666 | trades=1240 | equity=$5,486.14 | ETA=4.2min
+   73.9% | bar=103,238/139,666 | trades=1250 | equity=$5,425.95 | ETA=4.1min
+   73.9% | bar=103,242/139,666 | trades=1250 | equity=$5,425.95 | ETA=4.1min
+   73.9% | bar=103,246/139,666 | trades=1250 | equity=$5,425.95 | ETA=4.1min
+   74.2% | bar=103,706/139,666 | trades=1260 | equity=$5,510.60 | ETA=4.0min
+   74.2% | bar=103,710/139,666 | trades=1260 | equity=$5,510.60 | ETA=4.0min
+   74.2% | bar=103,714/139,666 | trades=1260 | equity=$5,510.60 | ETA=4.0min
+   74.2% | bar=103,718/139,666 | trades=1260 | equity=$5,510.60 | ETA=4.0min
+   74.2% | bar=103,738/139,666 | trades=1260 | equity=$5,510.60 | ETA=4.0min
+   75.0% | bar=104,750/139,666 | trades=1270 | equity=$5,431.84 | ETA=3.9min
+   75.0% | bar=104,754/139,666 | trades=1270 | equity=$5,431.84 | ETA=3.9min
+   75.4% | bar=105,406/139,666 | trades=1280 | equity=$5,666.99 | ETA=3.8min
+   76.2% | bar=106,458/139,666 | trades=1290 | equity=$5,605.24 | ETA=3.7min
+   76.2% | bar=106,470/139,666 | trades=1290 | equity=$5,605.24 | ETA=3.7min
+   76.5% | bar=106,926/139,666 | trades=1300 | equity=$6,206.63 | ETA=3.7min
+   76.5% | bar=106,930/139,666 | trades=1300 | equity=$6,206.63 | ETA=3.7min
+   77.1% | bar=107,730/139,666 | trades=1310 | equity=$6,118.14 | ETA=3.6min
+   77.1% | bar=107,738/139,666 | trades=1310 | equity=$6,118.14 | ETA=3.6min
+   77.6% | bar=108,454/139,666 | trades=1320 | equity=$6,179.90 | ETA=3.5min
+   77.6% | bar=108,458/139,666 | trades=1320 | equity=$6,179.90 | ETA=3.5min
+   77.6% | bar=108,462/139,666 | trades=1320 | equity=$6,179.90 | ETA=3.5min
+   78.4% | bar=109,510/139,666 | trades=1330 | equity=$5,897.05 | ETA=3.4min
+   78.7% | bar=110,034/139,666 | trades=1340 | equity=$5,643.06 | ETA=3.3min
+   79.2% | bar=110,722/139,666 | trades=1350 | equity=$5,693.87 | ETA=3.3min
+   79.9% | bar=111,690/139,666 | trades=1360 | equity=$5,800.13 | ETA=3.1min
+   80.3% | bar=112,230/139,666 | trades=1370 | equity=$5,737.54 | ETA=3.1min
+   81.1% | bar=113,282/139,666 | trades=1380 | equity=$5,954.52 | ETA=3.0min
+   81.1% | bar=113,310/139,666 | trades=1380 | equity=$5,954.52 | ETA=3.0min
+   81.1% | bar=113,350/139,666 | trades=1380 | equity=$5,954.52 | ETA=3.0min
+   81.1% | bar=113,354/139,666 | trades=1380 | equity=$5,954.52 | ETA=3.0min
+   81.2% | bar=113,414/139,666 | trades=1380 | equity=$5,954.52 | ETA=2.9min
+   81.4% | bar=113,754/139,666 | trades=1390 | equity=$6,213.77 | ETA=2.9min
+   81.8% | bar=114,258/139,666 | trades=1400 | equity=$6,398.60 | ETA=2.8min
+   82.3% | bar=115,002/139,666 | trades=1410 | equity=$6,288.95 | ETA=2.8min
+   82.3% | bar=115,006/139,666 | trades=1410 | equity=$6,288.95 | ETA=2.8min
+   82.7% | bar=115,490/139,666 | trades=1420 | equity=$6,330.93 | ETA=2.7min
+   82.7% | bar=115,494/139,666 | trades=1420 | equity=$6,330.93 | ETA=2.7min
+   83.0% | bar=115,978/139,666 | trades=1430 | equity=$6,557.26 | ETA=2.7min
+   83.0% | bar=115,982/139,666 | trades=1430 | equity=$6,557.26 | ETA=2.6min
+   83.7% | bar=116,942/139,666 | trades=1440 | equity=$7,078.21 | ETA=2.5min
+   84.1% | bar=117,530/139,666 | trades=1450 | equity=$6,904.95 | ETA=2.5min
+   84.5% | bar=118,074/139,666 | trades=1460 | equity=$6,806.16 | ETA=2.4min
+   85.1% | bar=118,838/139,666 | trades=1470 | equity=$7,070.53 | ETA=2.3min
+   85.1% | bar=118,842/139,666 | trades=1470 | equity=$7,070.53 | ETA=2.3min
+   85.1% | bar=118,866/139,666 | trades=1470 | equity=$7,070.53 | ETA=2.3min
+   85.9% | bar=119,974/139,666 | trades=1480 | equity=$6,789.03 | ETA=2.2min
+   86.3% | bar=120,630/139,666 | trades=1490 | equity=$6,894.38 | ETA=2.1min
+   86.3% | bar=120,634/139,666 | trades=1490 | equity=$6,894.38 | ETA=2.1min
+   86.4% | bar=120,638/139,666 | trades=1490 | equity=$6,894.38 | ETA=2.1min
+   86.9% | bar=121,450/139,666 | trades=1500 | equity=$6,592.96 | ETA=2.0min
+   87.4% | bar=122,078/139,666 | trades=1510 | equity=$6,520.17 | ETA=2.0min
+   87.8% | bar=122,598/139,666 | trades=1520 | equity=$6,881.49 | ETA=1.9min
+   88.1% | bar=123,082/139,666 | trades=1530 | equity=$6,967.49 | ETA=1.8min
+   88.1% | bar=123,086/139,666 | trades=1530 | equity=$6,967.49 | ETA=1.8min
+   88.1% | bar=123,090/139,666 | trades=1530 | equity=$6,967.49 | ETA=1.8min
+   88.6% | bar=123,738/139,666 | trades=1540 | equity=$7,454.37 | ETA=1.8min
+   89.2% | bar=124,542/139,666 | trades=1550 | equity=$7,775.62 | ETA=1.7min
+   89.5% | bar=125,082/139,666 | trades=1560 | equity=$7,842.78 | ETA=1.6min
+   89.5% | bar=125,086/139,666 | trades=1560 | equity=$7,842.78 | ETA=1.6min
+   89.6% | bar=125,122/139,666 | trades=1560 | equity=$7,842.78 | ETA=1.6min
+   89.9% | bar=125,518/139,666 | trades=1570 | equity=$7,710.84 | ETA=1.6min
+   89.9% | bar=125,522/139,666 | trades=1570 | equity=$7,710.84 | ETA=1.6min
+   89.9% | bar=125,526/139,666 | trades=1570 | equity=$7,710.84 | ETA=1.6min
+   89.9% | bar=125,530/139,666 | trades=1570 | equity=$7,710.84 | ETA=1.6min
+   89.9% | bar=125,554/139,666 | trades=1570 | equity=$7,710.84 | ETA=1.6min
+   90.5% | bar=126,474/139,666 | trades=1580 | equity=$7,381.23 | ETA=1.5min
+   90.5% | bar=126,478/139,666 | trades=1580 | equity=$7,381.23 | ETA=1.5min
+   91.4% | bar=127,718/139,666 | trades=1600 | equity=$7,486.41 | ETA=1.3min
+   92.0% | bar=128,490/139,666 | trades=1610 | equity=$7,402.22 | ETA=1.2min
+   92.5% | bar=129,146/139,666 | trades=1620 | equity=$7,229.12 | ETA=1.2min
+   92.8% | bar=129,562/139,666 | trades=1630 | equity=$7,489.67 | ETA=1.1min
+   92.8% | bar=129,570/139,666 | trades=1630 | equity=$7,489.67 | ETA=1.1min
+   92.8% | bar=129,582/139,666 | trades=1630 | equity=$7,489.67 | ETA=1.1min
+   92.8% | bar=129,586/139,666 | trades=1630 | equity=$7,489.67 | ETA=1.1min
+   93.1% | bar=130,038/139,666 | trades=1640 | equity=$7,757.25 | ETA=1.1min
+   93.6% | bar=130,774/139,666 | trades=1650 | equity=$7,879.94 | ETA=1.0min
+   94.0% | bar=131,286/139,666 | trades=1660 | equity=$8,064.91 | ETA=0.9min
+   94.4% | bar=131,858/139,666 | trades=1670 | equity=$8,351.42 | ETA=0.9min
+   94.7% | bar=132,338/139,666 | trades=1680 | equity=$9,114.73 | ETA=0.8min
+   95.2% | bar=132,954/139,666 | trades=1690 | equity=$8,989.35 | ETA=0.7min
+   95.7% | bar=133,642/139,666 | trades=1700 | equity=$8,576.85 | ETA=0.7min
+   96.2% | bar=134,394/139,666 | trades=1710 | equity=$8,235.92 | ETA=0.6min
+   96.8% | bar=135,218/139,666 | trades=1720 | equity=$8,343.53 | ETA=0.5min
+   97.5% | bar=136,194/139,666 | trades=1730 | equity=$7,986.09 | ETA=0.4min
+   97.5% | bar=136,214/139,666 | trades=1730 | equity=$7,986.09 | ETA=0.4min
+   98.0% | bar=136,862/139,666 | trades=1740 | equity=$8,977.84 | ETA=0.3min
+   98.5% | bar=137,506/139,666 | trades=1750 | equity=$9,055.76 | ETA=0.2min
+   98.5% | bar=137,578/139,666 | trades=1750 | equity=$9,055.76 | ETA=0.2min
+   99.0% | bar=138,274/139,666 | trades=1760 | equity=$9,100.41 | ETA=0.2min
+   99.4% | bar=138,846/139,666 | trades=1770 | equity=$10,205.34 | ETA=0.1min
+   99.4% | bar=138,858/139,666 | trades=1770 | equity=$10,205.34 | ETA=0.1min
+   99.4% | bar=138,862/139,666 | trades=1770 | equity=$10,205.34 | ETA=0.1min
+   99.4% | bar=138,866/139,666 | trades=1770 | equity=$10,205.34 | ETA=0.1min
+   99.4% | bar=138,878/139,666 | trades=1770 | equity=$10,205.34 | ETA=0.1min
+   99.5% | bar=138,922/139,666 | trades=1770 | equity=$10,205.34 | ETA=0.1min
+  100.0% | bar=139,602/139,666 | trades=1780 | equity=$9,958.36 | ETA=0.0min
+
+  Selesai dalam 15.4 menit | 1782 trades [circuit breaker DINONAKTIFKAN]
+
+==============================================================
+  BACKTEST REPORT  USDJPY  (5 tahun, no circuit breaker)
+==============================================================
+  Initial equity    : $1,000.00
+  Final equity      : $9,858.72
+  Total return      : +885.87%
+  Max drawdown      : 29.37%
+--------------------------------------------------------------
+  Total trades      : 1782
+  Win / BE / Loss   : 660 / 0 / 1122
+  Win rate          : 37.0%
+  Avg win           : +2.083%
+  Avg loss          : -1.001%
+  Profit factor     : 1.22
+  Order types       : {'LIMIT': 812, 'MARKET': 970}
+  Close reasons     : {'sl': 1122, 'tp': 659, 'end_of_data': 1}
+==============================================================
+
+  STRATEGI          #  WIN    WR%    PF    AvgW%   AvgL%  Verdict
+  --------------------------------------------------------------
+  FVG             812  335  41.3%  1.40   +2.00%  -1.00%  OK
+  EMA_TREND       627  254  40.5%  1.13   +1.67%  -1.00%  OK
+  BUMI            343   71  20.7%  1.03   +3.95%  -1.00%  BURUK
+
+  Last 10 trades:
+  #    Strategy       Dir         Open      Close     PnL%  Reason
+  --------------------------------------------------------------
+  1    EMA_TREND      BUY      150.660    150.248  -1.011%  sl
+  2    BUMI           SELL     148.239    146.762  +4.053%  tp
+  3    FVG            SELL     147.517    147.610  -0.999%  sl
+  4    FVG            SELL     147.201    147.281  -1.000%  sl
+  5    FVG            SELL     147.377    147.458  -1.003%  sl
+  6    FVG            SELL     147.375    147.447  -1.002%  sl
+  7    EMA_TREND      SELL     146.856    147.219  -0.998%  sl
+  8    FVG            SELL     147.516    147.571  -0.999%  sl
+  9    FVG            SELL     147.506    147.592  -1.001%  sl
+  10   BUMI           BUY      148.014    148.149  +1.245%  end_of_data
+
+  Trade log: C:\laragon\www\ea-project\backend\logs\backtest_USDJPY.json

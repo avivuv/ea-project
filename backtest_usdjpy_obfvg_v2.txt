@@ -1,0 +1,1 @@
+C:\laragon\bin\python\python-3.10\python.exe: can't open file 'c:\\laragon\\www\\ea-project\\backtest.py': [Errno 2] No such file or directory
