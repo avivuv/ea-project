@@ -39,6 +39,8 @@ from config import (
     OB_CONFIRM_REQUIRE_SWEEP, OB_CONFIRM_SWEEP_LOOKBACK,
     OB_CONFIRM_SWEEP_WINDOW, OB_CONFIRM_SWEEP_TOL_ATR,
     OB_CONFIRM_AGE_BONUS_FVG, OB_CONFIRM_AGE_BONUS_BOS, OB_CONFIRM_AGE_BONUS_SWEEP,
+    OB_CONFIRM_ENGULF_RATIO, OB_CONFIRM_REJECTION_WICK,
+    OB_WICK_THRESHOLD,
 )
 
 log = logging.getLogger(__name__)
@@ -187,11 +189,18 @@ def _find_h4_obs(df: pd.DataFrame, atr: float, lookback: int,
                 move = max(move, nxt2["high"] - c["low"])
             if move < impulse_mult * atr:
                 continue
-            top    = max(c["open"], c["close"])
-            bottom = min(c["open"], c["close"])
-            if len(sub_closes) > 0 and (sub_closes < bottom).any():
+            body_top    = max(c["open"], c["close"])
+            body_bottom = min(c["open"], c["close"])
+            c_range     = c["high"] - c["low"]
+            b_ratio     = (body_top - body_bottom) / c_range if c_range > 0 else 0
+            top    = c["high"]    if b_ratio >= OB_WICK_THRESHOLD else body_top
+            bottom = c["low"]     if b_ratio >= OB_WICK_THRESHOLD else body_bottom
+            # Invalidasi pakai body_bottom: OB gugur hanya jika close melewati body
+            if len(sub_closes) > 0 and (sub_closes < body_bottom).any():
                 continue
-            touched   = len(sub_lows) > 0 and (sub_lows < top).any()
+            zone_mid  = (top + bottom) / 2
+            # Touched: price menembus ke dalam ≥50% zona (bukan sekadar menyentuh wick)
+            touched   = len(sub_lows) > 0 and (sub_lows <= zone_mid).any()
             has_fvg   = ((nxt2 is not None and nxt2["low"] > c["high"])
                          or nxt1["low"] > c["close"])
             has_bos   = (nxt1["close"] > swing_high or
@@ -207,11 +216,18 @@ def _find_h4_obs(df: pd.DataFrame, atr: float, lookback: int,
                 move = max(move, c["high"] - nxt2["low"])
             if move < impulse_mult * atr:
                 continue
-            top    = max(c["open"], c["close"])
-            bottom = min(c["open"], c["close"])
-            if len(sub_closes) > 0 and (sub_closes > top).any():
+            body_top    = max(c["open"], c["close"])
+            body_bottom = min(c["open"], c["close"])
+            c_range     = c["high"] - c["low"]
+            b_ratio     = (body_top - body_bottom) / c_range if c_range > 0 else 0
+            top    = c["high"]    if b_ratio >= OB_WICK_THRESHOLD else body_top
+            bottom = c["low"]     if b_ratio >= OB_WICK_THRESHOLD else body_bottom
+            # Invalidasi pakai body_top: OB gugur hanya jika close melewati body
+            if len(sub_closes) > 0 and (sub_closes > body_top).any():
                 continue
-            touched   = len(sub_highs) > 0 and (sub_highs > bottom).any()
+            zone_mid  = (top + bottom) / 2
+            # Touched: price menembus ke dalam ≥50% zona
+            touched   = len(sub_highs) > 0 and (sub_highs >= zone_mid).any()
             has_fvg   = ((nxt2 is not None and nxt2["high"] < c["low"])
                          or nxt1["high"] < c["close"])
             has_bos   = (nxt1["close"] < swing_low or
@@ -261,8 +277,15 @@ def _find_ltf_ob(df: pd.DataFrame, direction: str, lookback: int,
         if direction == "BUY"  and c["close"] >= c["open"]: continue
         if direction == "SELL" and c["close"] <= c["open"]: continue
 
-        top      = max(c["open"], c["close"])
-        bottom   = min(c["open"], c["close"])
+        body_top    = max(c["open"], c["close"])
+        body_bottom = min(c["open"], c["close"])
+        # M15 OB: gunakan full range jika wick wajar, body saja jika wick terlalu panjang
+        if body_ratio >= OB_WICK_THRESHOLD:
+            top    = c["high"]
+            bottom = c["low"]
+        else:
+            top    = body_top
+            bottom = body_bottom
         bars_ago = n - 1 - i
 
         has_fvg = False

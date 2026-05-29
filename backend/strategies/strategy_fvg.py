@@ -25,7 +25,7 @@ from config import (
     FVG_LOOKBACK, FVG_MIN_GAP_ATR, FVG_MIN_GAP_ATR_PAIRS, FVG_PROXIMITY_ATR,
     FVG_SL_BUFFER_ATR, FVG_SL_BUFFER_ATR_BY_PAIR, FVG_RR, FVG_MAX_AGE_BARS,
     FVG_HTF_TREND_FILTER, FVG_HTF_EMA_FAST, FVG_HTF_EMA_SLOW,
-    FVG_CONFIRM_BOUNCE,
+    FVG_CONFIRM_BOUNCE, FVG_MAX_CHASE_ATR,
 )
 
 log = logging.getLogger(__name__)
@@ -122,9 +122,25 @@ class StrategyFVG(BaseStrategy):
                 bounce_confirmed = prev_touched and curr_rejected
 
             if bounce_confirmed:
-                # Ganti ke MARKET order, entry di harga terkini
-                order_type  = "MARKET"
-                entry_price = 0.0  # 0 = entry di close bar
+                # Cek apakah price sudah terlalu jauh dari zona setelah bounce
+                max_chase = FVG_MAX_CHASE_ATR * atr
+                too_far = (
+                    (fvg.direction == "BUY"  and curr_price > fvg.top    + max_chase) or
+                    (fvg.direction == "SELL" and curr_price < fvg.bottom - max_chase)
+                )
+                if too_far:
+                    # Entry terlalu jauh dari zona → fallback LIMIT di mid zona
+                    bounce_confirmed = False
+                    order_type  = "LIMIT"
+                    entry_price = fvg.mid
+                    log.info(
+                        f"[{pair}] FVG bounce too far from zone "
+                        f"(price={curr_price:.5f} zone=[{fvg.bottom:.5f}~{fvg.top:.5f}] "
+                        f"max_chase={max_chase:.5f}) → fallback LIMIT"
+                    )
+                else:
+                    order_type  = "MARKET"
+                    entry_price = 0.0  # 0 = entry di close bar
             else:
                 # Belum ada konfirmasi bounce — tetap LIMIT (mendekati zona)
                 order_type  = "LIMIT"
@@ -135,10 +151,16 @@ class StrategyFVG(BaseStrategy):
         sl_buf_mult = FVG_SL_BUFFER_ATR_BY_PAIR.get(pair.upper(), FVG_SL_BUFFER_ATR)
         buf       = sl_buf_mult * atr
 
-        if fvg.direction == "BUY":
-            sl_distance = (fvg.top - fvg.bottom) / 2 + buf  # SL di bawah zona
+        if bounce_confirmed:
+            # MARKET order: anchor SL ke batas luar zona FVG dari curr_price
+            # Untuk SELL: sl = fvg.top + buf (bukan entry + gap/2 + buf yang bisa jatuh di dalam zona)
+            if fvg.direction == "BUY":
+                sl_distance = curr_price - (fvg.bottom - buf)
+            else:
+                sl_distance = (fvg.top + buf) - curr_price
         else:
-            sl_distance = (fvg.top - fvg.bottom) / 2 + buf  # SL di atas zona
+            # LIMIT order: entry di fvg.mid, gap_size/2 sudah tepat ke tepi zona
+            sl_distance = gap_size / 2 + buf
 
         if sl_distance <= 0:
             return StrategySignal(self.strategy_id, "HOLD", reason="sl_zero")

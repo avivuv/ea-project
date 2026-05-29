@@ -1,0 +1,62 @@
+[
+  {
+    "direction": "BUY",
+    "mode": "bounce",
+    "order_type": "MARKET",
+    "confidence": 0.95,
+    "open_idx": 16736,
+    "open_price": 1957.605,
+    "sl_price": 1955.04905,
+    "tp_price": 1965.27284,
+    "close_idx": 16739,
+    "close_price": 1955.04905,
+    "lot_size": 0.39,
+    "pnl_pct": -0.9968,
+    "close_reason": "sl"
+  },
+  {
+    "direction": "BUY",
+    "mode": "bounce",
+    "order_type": "MARKET",
+    "confidence": 0.95,
+    "open_idx": 33053,
+    "open_price": 1896.368,
+    "sl_price": 1894.30171,
+    "tp_price": 1902.56688,
+    "close_idx": 33064,
+    "close_price": 1894.30171,
+    "lot_size": 0.48,
+    "pnl_pct": -1.0018,
+    "close_reason": "sl"
+  },
+  {
+    "direction": "BUY",
+    "mode": "limit",
+    "order_type": "LIMIT",
+    "confidence": 0.95,
+    "open_idx": 92865,
+    "open_price": 2036.235,
+    "sl_price": 2034.08155,
+    "tp_price": 2042.69534,
+    "close_idx": 92867,
+    "close_price": 2034.08155,
+    "lot_size": 0.46,
+    "pnl_pct": -1.0107,
+    "close_reason": "sl"
+  },
+  {
+    "direction": "BUY",
+    "mode": "bounce",
+    "order_type": "MARKET",
+    "confidence": 0.95,
+    "open_idx": 108552,
+    "open_price": 2444.185,
+    "sl_price": 2437.60008,
+    "tp_price": 2463.93976,
+    "close_idx": 108561,
+    "close_price": 2437.60008,
+    "lot_size": 0.15,
+    "pnl_pct": -1.018,
+    "close_reason": "sl"
+  }
+]

@@ -23,6 +23,7 @@ from config import (
     OBFVG_LOOKBACK, OBFVG_IMPULSE_ATR, OBFVG_PROXIMITY_ATR,
     OBFVG_SL_BUFFER_ATR, OBFVG_SL_BUFFER_ATR_BY_PAIR, OBFVG_RR, OBFVG_FVG_REQUIRED,
     OBFVG_HTF_EMA_FAST, OBFVG_HTF_EMA_SLOW, OBFVG_MAX_OB_AGE,
+    OB_WICK_THRESHOLD,
 )
 
 log = logging.getLogger(__name__)
@@ -69,16 +70,20 @@ def _find_order_blocks(df: pd.DataFrame, atr: float, lookback: int,
             if next2 is not None:
                 move = max(move, next2["high"] - c["low"])  # total range impulse
             if move >= impulse_mult * atr:
-                top    = max(c["open"], c["close"])
-                bottom = min(c["open"], c["close"])
-                # FVG = gap antara high OB candle (c) dan low candle setelah impulse (next2)
-                # Jika next2 ada dan low next2 > high c → gap/imbalance nyata
+                body_top    = max(c["open"], c["close"])
+                body_bottom = min(c["open"], c["close"])
+                c_range     = c["high"] - c["low"]
+                body_ratio  = (body_top - body_bottom) / c_range if c_range > 0 else 0
+                # SMC standar: zona = High ke Low; fallback body saja jika wick terlalu panjang
+                if body_ratio >= OB_WICK_THRESHOLD:
+                    top, bottom = c["high"], c["low"]
+                else:
+                    top, bottom = body_top, body_bottom
                 has_fvg = (next2 is not None and next2["low"] > c["high"])
-                # Fallback: cek gap antara low impulse dan high OB (gap lebih longgar)
                 if not has_fvg:
                     has_fvg = next1["low"] > c["close"]
-                # OB invalid (swept) jika ada close di bawah bottom setelah OB terbentuk
-                if len(subsequent_closes) == 0 or not (subsequent_closes < bottom).any():
+                # OB invalid jika ada close di bawah body_bottom (level kritis, bukan wick)
+                if len(subsequent_closes) == 0 or not (subsequent_closes < body_bottom).any():
                     obs.append(OrderBlock("BUY", top, bottom, (top + bottom) / 2,
                                           n - 1 - i, has_fvg))
 
@@ -88,14 +93,19 @@ def _find_order_blocks(df: pd.DataFrame, atr: float, lookback: int,
             if next2 is not None:
                 move = max(move, c["high"] - next2["low"])  # total range impulse
             if move >= impulse_mult * atr:
-                top    = max(c["open"], c["close"])
-                bottom = min(c["open"], c["close"])
-                # FVG = gap antara low OB candle (c) dan high candle setelah impulse (next2)
+                body_top    = max(c["open"], c["close"])
+                body_bottom = min(c["open"], c["close"])
+                c_range     = c["high"] - c["low"]
+                body_ratio  = (body_top - body_bottom) / c_range if c_range > 0 else 0
+                if body_ratio >= OB_WICK_THRESHOLD:
+                    top, bottom = c["high"], c["low"]
+                else:
+                    top, bottom = body_top, body_bottom
                 has_fvg = (next2 is not None and next2["high"] < c["low"])
                 if not has_fvg:
                     has_fvg = next1["high"] < c["close"]
-                # OB invalid (swept) jika ada close di atas top setelah OB terbentuk
-                if len(subsequent_closes) == 0 or not (subsequent_closes > top).any():
+                # OB invalid jika ada close di atas body_top (level kritis, bukan wick)
+                if len(subsequent_closes) == 0 or not (subsequent_closes > body_top).any():
                     obs.append(OrderBlock("SELL", top, bottom, (top + bottom) / 2,
                                           n - 1 - i, has_fvg))
 

@@ -225,6 +225,7 @@ FVG_SL_BUFFER_ATR_BY_PAIR: dict[str, float] = {
 FVG_RR              = float(os.getenv("FVG_RR", "2.0"))
 FVG_MAX_AGE_BARS    = int(os.getenv("FVG_MAX_AGE_BARS", "30"))      # zone lebih tua dari ini diabaikan
 FVG_CONFIRM_BOUNCE  = os.getenv("FVG_CONFIRM_BOUNCE", "true").lower() == "true"  # tunggu candle reject zona
+FVG_MAX_CHASE_ATR   = float(os.getenv("FVG_MAX_CHASE_ATR", "0.5"))  # max jarak entry dari zona setelah bounce (× ATR); lebih jauh → fallback LIMIT
 
 # Per-pair FVG minimum gap override (pair lebih choppy butuh threshold lebih tinggi)
 FVG_MIN_GAP_ATR_PAIRS: dict[str, float] = {}
@@ -336,6 +337,12 @@ OB_CONFIRM_SWEEP_LOOKBACK = int(os.getenv("OB_CONFIRM_SWEEP_LOOKBACK", "30"))   
 OB_CONFIRM_SWEEP_WINDOW   = int(os.getenv("OB_CONFIRM_SWEEP_WINDOW", "5"))      # bar sebelum OB untuk cek sweep candle
 OB_CONFIRM_SWEEP_TOL_ATR  = float(os.getenv("OB_CONFIRM_SWEEP_TOL_ATR", "0.3")) # toleransi equal H/L = N × ATR
 
+# ── Order Block zone definition ───────────────────────────────────────────────
+# Jika body / candle_range >= threshold → zona = High ke Low (full candle, SMC standar)
+# Jika body / candle_range < threshold  → zona = Open ke Close (body only, wick terlalu panjang)
+# 0.35 = batas wajar: candle dengan body < 35% dari total range (pin bar, doji) → pakai body
+OB_WICK_THRESHOLD = float(os.getenv("OB_WICK_THRESHOLD", "0.35"))
+
 # ── Strategy BUMI — 4 MA Cross (SMA 5, 13, 21, 34) ──────────────────────────
 BUMI_ENABLED      = os.getenv("BUMI_ENABLED", "false").lower() == "true"
 BUMI_MA_FAST      = int(os.getenv("BUMI_MA_FAST", "5"))
@@ -347,6 +354,32 @@ BUMI_ENGULF_CONF  = os.getenv("BUMI_ENGULF_CONF", "false").lower() == "true"  # 
 BUMI_SL_ATR_MULT  = float(os.getenv("BUMI_SL_ATR_MULT", "1.5"))
 BUMI_RR           = float(os.getenv("BUMI_RR", "4.0"))                         # RR 1:4 sesuai dokumen
 BUMI_LOOKBACK     = int(os.getenv("BUMI_LOOKBACK", "3"))                        # candle lookback cek cross
+
+# ── Strategy BPR — Balanced Price Range (M15) ────────────────────────────────
+BPR_ENABLED            = os.getenv("BPR_ENABLED", "true").lower() == "true"
+BPR_LOOKBACK           = int(os.getenv("BPR_LOOKBACK", "100"))        # M15 bars discan (≈25 jam)
+BPR_MIN_GAP_ATR        = float(os.getenv("BPR_MIN_GAP_ATR", "0.3"))   # ukuran FVG minimum (N × ATR)
+BPR_PROXIMITY_ATR      = float(os.getenv("BPR_PROXIMITY_ATR", "1.5")) # jarak max price ke zona (N × ATR)
+BPR_DISPLACEMENT_RATIO = float(os.getenv("BPR_DISPLACEMENT_RATIO", "0.5"))  # body C2 min 50% dari range
+BPR_SL_BUFFER_ATR      = float(os.getenv("BPR_SL_BUFFER_ATR", "0.3"))
+BPR_SL_BUFFER_ATR_BY_PAIR: dict[str, float] = {
+    "US500": 1.5, "USTEC": 1.5,
+}
+BPR_RR                 = float(os.getenv("BPR_RR", "3.0"))            # target RR 1:3
+BPR_MAX_AGE_BARS       = int(os.getenv("BPR_MAX_AGE_BARS", "60"))     # BPR lebih tua dari ini diabaikan (≈15 jam M15)
+BPR_MAX_TEMPORAL_GAP   = int(os.getenv("BPR_MAX_TEMPORAL_GAP", "24"))  # jarak max bars antar dua FVG (ICT V-shape ~6 jam M15)
+BPR_MAX_CHASE_ATR      = float(os.getenv("BPR_MAX_CHASE_ATR", "0.5")) # max jarak entry dari zona setelah bounce
+BPR_HTF_TREND_FILTER   = os.getenv("BPR_HTF_TREND_FILTER", "true").lower() == "true"
+BPR_HTF_EMA_FAST       = int(os.getenv("BPR_HTF_EMA_FAST", "20"))    # H4 EMA cepat
+BPR_HTF_EMA_SLOW       = int(os.getenv("BPR_HTF_EMA_SLOW", "50"))    # H4 EMA lambat
+BPR_DISABLED_PAIRS     = [p.strip().upper() for p in os.getenv("BPR_DISABLED_PAIRS", "").split(",") if p.strip()]
+
+# Per-pair BPR minimum gap override (pair choppy butuh threshold lebih tinggi)
+BPR_MIN_GAP_ATR_PAIRS: dict[str, float] = {}
+for _item in os.getenv("BPR_MIN_GAP_ATR_PAIRS", "USDJPY:0.5,EURUSD:0.4,GBPUSD:0.4").split(","):
+    if ":" in _item:
+        _k, _v = _item.split(":", 1)
+        BPR_MIN_GAP_ATR_PAIRS[_k.strip().upper()] = float(_v.strip())
 
 # ── Strategy Runner ───────────────────────────────────────────────────────────
 MIN_SIGNAL_CONF     = float(os.getenv("MIN_SIGNAL_CONF", "0.55"))   # sinyal di bawah ini diabaikan sebelum aggregasi

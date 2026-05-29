@@ -9,7 +9,8 @@ from strategies.strategy_fvg import StrategyFVG
 from strategies.strategy_bumi import StrategyBUMI
 from strategies.strategy_obfvg import StrategyOBFVG
 from strategies.strategy_ob_confirm import StrategyOBConfirm
-from config import MIN_SIGNAL_CONF, MIN_STRATEGIES_CONFIRM, SINGLE_HIGH_CONF, ATR_PERIOD, BUMI_ENABLED, OBFVG_ENABLED, OBFVG_DISABLED_PAIRS, OB_CONFIRM_ENABLED, OB_CONFIRM_DISABLED_PAIRS
+from strategies.strategy_bpr import StrategyBPR
+from config import MIN_SIGNAL_CONF, MIN_STRATEGIES_CONFIRM, SINGLE_HIGH_CONF, ATR_PERIOD, BUMI_ENABLED, OBFVG_ENABLED, OBFVG_DISABLED_PAIRS, OB_CONFIRM_ENABLED, OB_CONFIRM_DISABLED_PAIRS, BPR_ENABLED, BPR_DISABLED_PAIRS
 from sr_detector import find_sr_levels, near_sr_level
 
 SR_CONFLUENCE_BONUS     = 0.10   # bonus confidence jika entry dekat S/R level
@@ -23,6 +24,7 @@ _strategies = [
     *([StrategyBUMI()]      if BUMI_ENABLED      else []),  # BUMI 4 MA Cross (opsional)
     *([StrategyOBFVG()]     if OBFVG_ENABLED     else []),  # OB+FVG confluence (opsional)
     *([StrategyOBConfirm()] if OB_CONFIRM_ENABLED else []), # OB fresh + candle confirmation
+    *([StrategyBPR()]       if BPR_ENABLED       else []), # Balanced Price Range (M15)
 ]
 
 
@@ -56,6 +58,9 @@ def run_all(
     for strategy in _strategies:
         if strategy.strategy_id == "OBFVG" and pair in OBFVG_DISABLED_PAIRS:
             log.info(f"[{pair}] OBFVG skipped (disabled for this pair)")
+            continue
+        if strategy.strategy_id == "BPR" and pair.upper() in BPR_DISABLED_PAIRS:
+            log.info(f"[{pair}] BPR skipped (disabled for this pair)")
             continue
         if strategy.strategy_id == "OB_CONFIRM" and pair.upper() in OB_CONFIRM_DISABLED_PAIRS:
             log.info(f"[{pair}] OB_CONFIRM skipped (disabled for this pair)")

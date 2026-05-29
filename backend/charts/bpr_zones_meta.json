@@ -1,0 +1,347 @@
+[
+  {
+    "full_idx": 29266,
+    "direction": "BUY",
+    "top": 1713.018,
+    "bottom": 1712.198,
+    "mid": 1712.608,
+    "bull_fvg": {
+      "top": 1713.018,
+      "bottom": 1712.198,
+      "mid": 1712.608,
+      "bars_ago": 3
+    },
+    "bear_fvg": {
+      "top": 1723.058,
+      "bottom": 1711.598,
+      "mid": 1717.328,
+      "bars_ago": 13
+    },
+    "newer_bars_ago": 3,
+    "quality": 0.81905,
+    "atr": 2.592008999084033,
+    "time": "2021-03-29 17:00"
+  },
+  {
+    "full_idx": 31302,
+    "direction": "BUY",
+    "top": 1773.698,
+    "bottom": 1773.308,
+    "mid": 1773.503,
+    "bull_fvg": {
+      "top": 1773.698,
+      "bottom": 1773.308,
+      "mid": 1773.503,
+      "bars_ago": 1
+    },
+    "bear_fvg": {
+      "top": 1779.265,
+      "bottom": 1773.258,
+      "mid": 1776.2615,
+      "bars_ago": 27
+    },
+    "newer_bars_ago": 1,
+    "quality": 0.38855,
+    "atr": 2.0355233931812298,
+    "time": "2021-04-29 20:00"
+  },
+  {
+    "full_idx": 32614,
+    "direction": "BUY",
+    "top": 1873.735,
+    "bottom": 1873.565,
+    "mid": 1873.65,
+    "bull_fvg": {
+      "top": 1873.735,
+      "bottom": 1872.098,
+      "mid": 1872.9165,
+      "bars_ago": 1
+    },
+    "bear_fvg": {
+      "top": 1879.278,
+      "bottom": 1873.565,
+      "mid": 1876.4215,
+      "bars_ago": 31
+    },
+    "newer_bars_ago": 1,
+    "quality": 0.16835,
+    "atr": 2.8344140456294937,
+    "time": "2021-05-20 03:00"
+  },
+  {
+    "full_idx": 33046,
+    "direction": "BUY",
+    "top": 1894.888,
+    "bottom": 1894.218,
+    "mid": 1894.553,
+    "bull_fvg": {
+      "top": 1894.888,
+      "bottom": 1894.098,
+      "mid": 1894.493,
+      "bars_ago": 1
+    },
+    "bear_fvg": {
+      "top": 1900.078,
+      "bottom": 1894.218,
+      "mid": 1897.148,
+      "bars_ago": 5
+    },
+    "newer_bars_ago": 1,
+    "quality": 0.66965,
+    "atr": 2.614116490533654,
+    "time": "2021-05-26 19:00"
+  },
+  {
+    "full_idx": 34422,
+    "direction": "BUY",
+    "top": 1816.375,
+    "bottom": 1815.138,
+    "mid": 1815.7565,
+    "bull_fvg": {
+      "top": 1816.375,
+      "bottom": 1815.138,
+      "mid": 1815.7565,
+      "bars_ago": 1
+    },
+    "bear_fvg": {
+      "top": 1824.228,
+      "bottom": 1814.478,
+      "mid": 1819.353,
+      "bars_ago": 5
+    },
+    "newer_bars_ago": 1,
+    "quality": 1.23665,
+    "atr": 5.140203843184117,
+    "time": "2021-06-16 23:00"
+  },
+  {
+    "full_idx": 40266,
+    "direction": "SELL",
+    "top": 1804.178,
+    "bottom": 1803.948,
+    "mid": 1804.063,
+    "bull_fvg": {
+      "top": 1804.178,
+      "bottom": 1800.044,
+      "mid": 1802.111,
+      "bars_ago": 17
+    },
+    "bear_fvg": {
+      "top": 1805.378,
+      "bottom": 1803.948,
+      "mid": 1804.663,
+      "bars_ago": 1
+    },
+    "newer_bars_ago": 1,
+    "quality": 0.22905,
+    "atr": 2.250963771296955,
+    "time": "2021-09-14 19:00"
+  },
+  {
+    "full_idx": 59438,
+    "direction": "BUY",
+    "top": 1745.048,
+    "bottom": 1744.454,
+    "mid": 1744.751,
+    "bull_fvg": {
+      "top": 1745.048,
+      "bottom": 1744.454,
+      "mid": 1744.751,
+      "bars_ago": 1
+    },
+    "bear_fvg": {
+      "top": 1750.408,
+      "bottom": 1744.335,
+      "mid": 1747.3715,
+      "bars_ago": 46
+    },
+    "newer_bars_ago": 1,
+    "quality": 0.5916,
+    "atr": 1.9946481335633819,
+    "time": "2022-07-07 03:30"
+  },
+  {
+    "full_idx": 59882,
+    "direction": "SELL",
+    "top": 1733.405,
+    "bottom": 1732.874,
+    "mid": 1733.1395,
+    "bull_fvg": {
+      "top": 1733.405,
+      "bottom": 1727.418,
+      "mid": 1730.4115,
+      "bars_ago": 31
+    },
+    "bear_fvg": {
+      "top": 1733.598,
+      "bottom": 1732.874,
+      "mid": 1733.236,
+      "bars_ago": 1
+    },
+    "newer_bars_ago": 1,
+    "quality": 0.52935,
+    "atr": 2.2702922406041255,
+    "time": "2022-07-13 23:30"
+  },
+  {
+    "full_idx": 77134,
+    "direction": "SELL",
+    "top": 2012.365,
+    "bottom": 2011.914,
+    "mid": 2012.1395,
+    "bull_fvg": {
+      "top": 2015.064,
+      "bottom": 1993.115,
+      "mid": 2004.0895,
+      "bars_ago": 140
+    },
+    "bear_fvg": {
+      "top": 2012.365,
+      "bottom": 2011.914,
+      "mid": 2012.1395,
+      "bars_ago": 4
+    },
+    "newer_bars_ago": 4,
+    "quality": 0.4436,
+    "atr": 1.906076229413717,
+    "time": "2023-04-06 03:15"
+  },
+  {
+    "full_idx": 78510,
+    "direction": "BUY",
+    "top": 1988.575,
+    "bottom": 1988.205,
+    "mid": 1988.39,
+    "bull_fvg": {
+      "top": 1988.575,
+      "bottom": 1986.195,
+      "mid": 1987.385,
+      "bars_ago": 2
+    },
+    "bear_fvg": {
+      "top": 1995.885,
+      "bottom": 1988.205,
+      "mid": 1992.045,
+      "bars_ago": 50
+    },
+    "newer_bars_ago": 2,
+    "quality": 0.3673,
+    "atr": 1.7747785686621604,
+    "time": "2023-04-28 02:15"
+  },
+  {
+    "full_idx": 83070,
+    "direction": "BUY",
+    "top": 1911.595,
+    "bottom": 1911.084,
+    "mid": 1911.3395,
+    "bull_fvg": {
+      "top": 1911.595,
+      "bottom": 1910.848,
+      "mid": 1911.2215,
+      "bars_ago": 2
+    },
+    "bear_fvg": {
+      "top": 1925.278,
+      "bottom": 1911.084,
+      "mid": 1918.181,
+      "bars_ago": 41
+    },
+    "newer_bars_ago": 2,
+    "quality": 0.50875,
+    "atr": 1.2382348680968691,
+    "time": "2023-07-06 23:45"
+  },
+  {
+    "full_idx": 96474,
+    "direction": "BUY",
+    "top": 2038.415,
+    "bottom": 2037.595,
+    "mid": 2038.005,
+    "bull_fvg": {
+      "top": 2038.415,
+      "bottom": 2037.595,
+      "mid": 2038.005,
+      "bars_ago": 1
+    },
+    "bear_fvg": {
+      "top": 2045.515,
+      "bottom": 2035.645,
+      "mid": 2040.58,
+      "bars_ago": 66
+    },
+    "newer_bars_ago": 1,
+    "quality": 0.8166,
+    "atr": 1.3687346695183515,
+    "time": "2024-01-31 08:45"
+  },
+  {
+    "full_idx": 101970,
+    "direction": "BUY",
+    "top": 2313.084,
+    "bottom": 2311.115,
+    "mid": 2312.0995,
+    "bull_fvg": {
+      "top": 2313.084,
+      "bottom": 2311.115,
+      "mid": 2312.0995,
+      "bars_ago": 1
+    },
+    "bear_fvg": {
+      "top": 2319.448,
+      "bottom": 2310.865,
+      "mid": 2315.1565,
+      "bars_ago": 4
+    },
+    "newer_bars_ago": 1,
+    "quality": 1.9687,
+    "atr": 3.0934880818526165,
+    "time": "2024-04-25 04:15"
+  },
+  {
+    "full_idx": 107526,
+    "direction": "BUY",
+    "top": 2443.865,
+    "bottom": 2443.718,
+    "mid": 2443.7915,
+    "bull_fvg": {
+      "top": 2443.865,
+      "bottom": 2443.085,
+      "mid": 2443.475,
+      "bars_ago": 1
+    },
+    "bear_fvg": {
+      "top": 2450.745,
+      "bottom": 2443.718,
+      "mid": 2447.2315,
+      "bars_ago": 6
+    },
+    "newer_bars_ago": 1,
+    "quality": 0.1466,
+    "atr": 3.107112707287257,
+    "time": "2024-07-18 20:45"
+  },
+  {
+    "full_idx": 130906,
+    "direction": "BUY",
+    "top": 3335.778,
+    "bottom": 3334.905,
+    "mid": 3335.3415,
+    "bull_fvg": {
+      "top": 3335.778,
+      "bottom": 3334.905,
+      "mid": 3335.3415,
+      "bars_ago": 1
+    },
+    "bear_fvg": {
+      "top": 3344.879,
+      "bottom": 3334.035,
+      "mid": 3339.457,
+      "bars_ago": 50
+    },
+    "newer_bars_ago": 1,
+    "quality": 0.8704,
+    "atr": 2.798456576911966,
+    "time": "2025-07-16 05:00"
+  }
+]
