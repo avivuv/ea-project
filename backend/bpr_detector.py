@@ -107,11 +107,18 @@ def detect_bpr(
     min_gap:            float = 0.0,
     displacement_ratio: float = 0.5,
     max_temporal_gap:   int   = 24,
+    max_zone_gap:       float = 0.0,
 ) -> list[BPRZone]:
     """
-    Deteksi semua zona BPR fresh — pasangan Bullish+Bearish FVG yang overlap.
+    Deteksi semua zona BPR fresh — pasangan Bullish+Bearish FVG yang overlap
+    atau berdekatan (jika max_zone_gap > 0).
 
-    Return diurutkan dari kualitas tertinggi (overlap terbesar + paling baru).
+    max_zone_gap > 0 mengaktifkan "near-BPR": pasangan bull+bear FVG yang tidak
+    overlap tapi jaraknya <= max_zone_gap. Zona near-BPR didefinisikan sebagai
+    FVG yang lebih baru (entry zone), dengan konfluens dari FVG yang lebih tua.
+    Berguna untuk instrumen trending (mis. XAUUSD) di mana strict overlap jarang.
+
+    Return diurutkan dari kualitas tertinggi (overlap/zona terbesar + paling baru).
     Hanya mengembalikan zona yang belum tersentuh (fresh) di midpoint.
     """
     all_fvgs = _detect_fvg_quality(df, lookback, min_gap, displacement_ratio)
@@ -126,13 +133,13 @@ def detect_bpr(
             overlap_top    = min(bull.top,    bear.top)
             overlap_bottom = max(bull.bottom, bear.bottom)
 
-            if overlap_top <= overlap_bottom:
-                continue  # tidak ada irisan nyata
+            # gap > 0 = tidak overlap; gap <= 0 = overlap (|gap| = ukuran overlap)
+            gap = overlap_bottom - overlap_top
 
-            overlap_mid  = (overlap_top + overlap_bottom) / 2.0
-            overlap_size = overlap_top - overlap_bottom
+            if gap > max_zone_gap:
+                continue  # terlalu jauh
 
-            # ICT BPR = V-shape lokal — dua FVG harus terbentuk dalam rentang waktu dekat
+            # ICT BPR = V-shape lokal — dua FVG terbentuk dalam rentang waktu dekat
             if abs(bull.bars_ago - bear.bars_ago) > max_temporal_gap:
                 continue
 
@@ -141,36 +148,51 @@ def detect_bpr(
                 direction      = "BUY"
                 newer_bars_ago = bull.bars_ago
                 older_bars_ago = bear.bars_ago
+                entry_fvg      = bull
             else:
                 direction      = "SELL"
                 newer_bars_ago = bear.bars_ago
                 older_bars_ago = bull.bars_ago
+                entry_fvg      = bear
 
-            # Freshness: cek apakah price sudah melewati midpoint BPR
-            # dihitung dari candle setelah FVG yang lebih baru terbentuk
+            if gap <= 0:
+                # Strict overlap — gunakan area irisan sebagai zona
+                zone_top    = overlap_top
+                zone_bottom = overlap_bottom
+            else:
+                # Near-BPR — gunakan FVG yang lebih baru sebagai zona entry
+                zone_top    = entry_fvg.top
+                zone_bottom = entry_fvg.bottom
+
+            zone_mid  = (zone_top + zone_bottom) / 2.0
+            zone_size = zone_top - zone_bottom
+
+            # Freshness: cek apakah price sudah melewati midpoint zona
             start_idx  = max(0, len(df) - newer_bars_ago)
             subsequent = df.iloc[start_idx:]
             if direction == "BUY":
-                still_fresh = not bool((subsequent["low"] <= overlap_mid).any())
+                still_fresh = not bool((subsequent["low"] <= zone_mid).any())
             else:
-                still_fresh = not bool((subsequent["high"] >= overlap_mid).any())
+                still_fresh = not bool((subsequent["high"] >= zone_mid).any())
 
             if not still_fresh:
                 continue
 
-            # Kualitas: overlap besar + usia muda = skor tinggi
+            # Kualitas: zona besar + usia muda = skor tinggi
+            # Near-BPR mendapat penalti kecil proporsional dengan gap
             quality = round(
-                overlap_size
+                zone_size
                 - newer_bars_ago * 0.0001
-                - older_bars_ago * 0.00005,
+                - older_bars_ago * 0.00005
+                - gap * 0.001,
                 8,
             )
 
             bpr_zones.append(BPRZone(
                 direction=direction,
-                top=round(overlap_top, 8),
-                bottom=round(overlap_bottom, 8),
-                mid=round(overlap_mid, 8),
+                top=round(zone_top, 8),
+                bottom=round(zone_bottom, 8),
+                mid=round(zone_mid, 8),
                 bull_fvg=bull,
                 bear_fvg=bear,
                 newer_bars_ago=newer_bars_ago,
@@ -191,6 +213,7 @@ def find_nearest_bpr(
     displacement_ratio: float = 0.5,
     max_age_bars:       int   = 60,
     max_temporal_gap:   int   = 24,
+    max_zone_gap_atr:   float = 0.0,
 ) -> BPRZone | None:
     """
     Cari BPR fresh terdekat ke harga saat ini yang searah dengan direction.
@@ -202,14 +225,16 @@ def find_nearest_bpr(
     if "atr" not in df.columns or pd.isna(df["atr"].iloc[-1]):
         return None
 
-    atr      = df["atr"].iloc[-1]
-    min_gap  = min_gap_atr * atr
-    curr     = df["close"].iloc[-1]
-    max_dist = proximity_atr * atr
+    atr          = df["atr"].iloc[-1]
+    min_gap      = min_gap_atr * atr
+    max_zone_gap = max_zone_gap_atr * atr
+    curr         = df["close"].iloc[-1]
+    max_dist     = proximity_atr * atr
 
     zones = detect_bpr(df, lookback=lookback, min_gap=min_gap,
                        displacement_ratio=displacement_ratio,
-                       max_temporal_gap=max_temporal_gap)
+                       max_temporal_gap=max_temporal_gap,
+                       max_zone_gap=max_zone_gap)
 
     for z in zones:
         if z.direction != direction:

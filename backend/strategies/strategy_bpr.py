@@ -33,6 +33,9 @@ from config import (
     BPR_SL_BUFFER_ATR, BPR_SL_BUFFER_ATR_BY_PAIR, BPR_RR,
     BPR_MAX_AGE_BARS, BPR_MAX_CHASE_ATR, BPR_MAX_TEMPORAL_GAP,
     BPR_HTF_TREND_FILTER, BPR_HTF_EMA_FAST, BPR_HTF_EMA_SLOW,
+    BPR_MAX_ZONE_GAP_ATR, BPR_MAX_ZONE_GAP_ATR_PAIRS,
+    BPR_RSI_FILTER, BPR_RSI_PERIOD, BPR_RSI_BUY_MAX, BPR_RSI_SELL_MIN,
+    BPR_ADX_FILTER, BPR_ADX_PERIOD, BPR_ADX_MIN,
 )
 
 log = logging.getLogger(__name__)
@@ -63,11 +66,24 @@ class StrategyBPR(BaseStrategy):
         df["atr"] = ta.volatility.average_true_range(
             df["high"], df["low"], df["close"], window=ATR_PERIOD
         )
+        df["rsi"] = ta.momentum.rsi(df["close"], window=BPR_RSI_PERIOD)
+        if BPR_ADX_FILTER:
+            adx_ind    = ta.trend.ADXIndicator(df["high"], df["low"], df["close"],
+                                               window=BPR_ADX_PERIOD)
+            df["adx"]  = adx_ind.adx()
 
         atr = df["atr"].iloc[-1]
         if pd.isna(atr) or atr <= 0:
             return StrategySignal(self.strategy_id, "HOLD", reason="atr_nan")
 
+        rsi         = df["rsi"].iloc[-1]
+
+        # ── ADX filter ────────────────────────────────────────────────────────
+        if BPR_ADX_FILTER:
+            adx = df["adx"].iloc[-1]
+            if not pd.isna(adx) and adx < BPR_ADX_MIN:
+                return StrategySignal(self.strategy_id, "HOLD",
+                                      reason=f"adx_low_{adx:.1f}")
         curr_price  = df["close"].iloc[-1]
         min_gap_atr = BPR_MIN_GAP_ATR_PAIRS.get(pair, BPR_MIN_GAP_ATR)
 
@@ -90,16 +106,18 @@ class StrategyBPR(BaseStrategy):
         allowed_sell = htf_trend in (None, "SELL")
 
         # ── Cari BPR zone terdekat ────────────────────────────────────────────
+        max_zone_gap_atr = BPR_MAX_ZONE_GAP_ATR_PAIRS.get(pair.upper(), BPR_MAX_ZONE_GAP_ATR)
+
         bpr_buy = find_nearest_bpr(
             df, "BUY",  BPR_PROXIMITY_ATR, BPR_LOOKBACK,
             min_gap_atr, BPR_DISPLACEMENT_RATIO, BPR_MAX_AGE_BARS,
-            BPR_MAX_TEMPORAL_GAP,
+            BPR_MAX_TEMPORAL_GAP, max_zone_gap_atr,
         ) if allowed_buy else None
 
         bpr_sell = find_nearest_bpr(
             df, "SELL", BPR_PROXIMITY_ATR, BPR_LOOKBACK,
             min_gap_atr, BPR_DISPLACEMENT_RATIO, BPR_MAX_AGE_BARS,
-            BPR_MAX_TEMPORAL_GAP,
+            BPR_MAX_TEMPORAL_GAP, max_zone_gap_atr,
         ) if allowed_sell else None
 
         # Pilih yang lebih dekat ke harga saat ini
@@ -120,18 +138,19 @@ class StrategyBPR(BaseStrategy):
         order_type       = "LIMIT"
         entry_price      = bpr.mid
         bounce_confirmed = False
+        zone_size_pre    = bpr.top - bpr.bottom   # dipakai di bounce check & SL
 
         if len(df) >= 2:
             prev = df.iloc[-2]
             curr = df.iloc[-1]
 
             if bpr.direction == "BUY":
-                # Wick harus masuk minimal ke midpoint zona (rejection nyata, bukan sekadar menyentuh tepi)
+                # Strict bounce: wick harus mencapai midpoint zona, close harus keluar atas zona
                 prev_touched  = prev["low"] <= bpr.mid
                 curr_rejected = curr["close"] > bpr.top
                 bounce_confirmed = prev_touched and curr_rejected
             else:
-                # Wick harus naik minimal ke midpoint zona
+                # Strict bounce: wick harus mencapai midpoint zona, close harus keluar bawah zona
                 prev_touched  = prev["high"] >= bpr.mid
                 curr_rejected = curr["close"] < bpr.bottom
                 bounce_confirmed = prev_touched and curr_rejected
@@ -159,7 +178,7 @@ class StrategyBPR(BaseStrategy):
         # ── Hitung SL & TP ────────────────────────────────────────────────────
         sl_buf_mult = BPR_SL_BUFFER_ATR_BY_PAIR.get(pair.upper(), BPR_SL_BUFFER_ATR)
         buf         = sl_buf_mult * atr
-        zone_size   = bpr.top - bpr.bottom
+        zone_size   = zone_size_pre
 
         if bounce_confirmed:
             # MARKET: SL anchored di tepi luar zona BPR dari posisi entry saat ini
@@ -173,6 +192,15 @@ class StrategyBPR(BaseStrategy):
 
         if sl_distance <= 0:
             return StrategySignal(self.strategy_id, "HOLD", reason="sl_zero")
+
+        # ── RSI Konfirmasi (LIMIT order saja) ─────────────────────────────────
+        if BPR_RSI_FILTER and order_type == "LIMIT" and not pd.isna(rsi):
+            if bpr.direction == "BUY" and rsi >= BPR_RSI_BUY_MAX:
+                return StrategySignal(self.strategy_id, "HOLD",
+                                      reason=f"rsi_too_high_{rsi:.1f}")
+            if bpr.direction == "SELL" and rsi <= BPR_RSI_SELL_MIN:
+                return StrategySignal(self.strategy_id, "HOLD",
+                                      reason=f"rsi_too_low_{rsi:.1f}")
 
         tp_distance = sl_distance * BPR_RR
 

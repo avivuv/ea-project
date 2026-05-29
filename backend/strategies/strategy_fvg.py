@@ -139,10 +139,13 @@ class StrategyFVG(BaseStrategy):
                         f"max_chase={max_chase:.5f}) → fallback LIMIT"
                     )
                 else:
-                    order_type  = "MARKET"
-                    entry_price = 0.0  # 0 = entry di close bar
+                    # Bounce valid: pasang LIMIT di zone edge bukan MARKET
+                    # BUY → limit di fvg.top (batas atas), SELL → limit di fvg.bottom (batas bawah)
+                    # Lebih presisi daripada chase MARKET setelah bounce candle
+                    order_type  = "LIMIT"
+                    entry_price = fvg.top if fvg.direction == "BUY" else fvg.bottom
             else:
-                # Belum ada konfirmasi bounce — tetap LIMIT (mendekati zona)
+                # Belum ada konfirmasi bounce — tetap LIMIT di mid zona
                 order_type  = "LIMIT"
                 entry_price = fvg.mid
 
@@ -152,12 +155,10 @@ class StrategyFVG(BaseStrategy):
         buf       = sl_buf_mult * atr
 
         if bounce_confirmed:
-            # MARKET order: anchor SL ke batas luar zona FVG dari curr_price
-            # Untuk SELL: sl = fvg.top + buf (bukan entry + gap/2 + buf yang bisa jatuh di dalam zona)
-            if fvg.direction == "BUY":
-                sl_distance = curr_price - (fvg.bottom - buf)
-            else:
-                sl_distance = (fvg.top + buf) - curr_price
+            # LIMIT di zone edge: SL di sisi luar zona (tepi jauh + buf)
+            # BUY entry di fvg.top  → SL di fvg.bottom - buf
+            # SELL entry di fvg.bottom → SL di fvg.top + buf
+            sl_distance = gap_size + buf
         else:
             # LIMIT order: entry di fvg.mid, gap_size/2 sudah tepat ke tepi zona
             sl_distance = gap_size / 2 + buf
@@ -172,7 +173,7 @@ class StrategyFVG(BaseStrategy):
         if bounce_confirmed:
             confidence = min(confidence + 0.15, 0.95)
 
-        mode_tag = "bounce" if bounce_confirmed else "limit"
+        mode_tag = "bounce_edge" if bounce_confirmed else "limit_mid"
         log.info(
             f"[{pair}] FVG {fvg.direction} [{mode_tag}] | zone=[{fvg.bottom:.5f}~{fvg.top:.5f}] "
             f"| gap={gap_size:.5f} | bars_ago={fvg.bars_ago} | conf={confidence:.2f}"

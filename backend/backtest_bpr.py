@@ -22,6 +22,7 @@ import time
 from dataclasses import dataclass, field
 
 import pandas as pd
+import ta
 
 logging.disable(logging.CRITICAL)
 
@@ -42,10 +43,10 @@ LIMIT_MAX_BARS = 20
 
 # ── Kombinasi parameter untuk mode sweep ──────────────────────────────────────
 SWEEP_CONFIGS = [
-    dict(label="T24     ", prox=2.5, age=100, gap=0.15, disp=0.3, rr=3.0, temporal=24),
-    dict(label="T48     ", prox=2.5, age=100, gap=0.15, disp=0.3, rr=3.0, temporal=48),
-    dict(label="T96     ", prox=2.5, age=100, gap=0.15, disp=0.3, rr=3.0, temporal=96),
-    dict(label="T192    ", prox=2.5, age=100, gap=0.15, disp=0.3, rr=3.0, temporal=192),
+    dict(label="ZG5-T48 ", prox=2.5, age=100, gap=0.15, disp=0.3, rr=3.0, temporal=48,  zone_gap=5.0),
+    dict(label="ZG8-T48 ", prox=2.5, age=100, gap=0.15, disp=0.3, rr=3.0, temporal=48,  zone_gap=8.0),
+    dict(label="ZG8-T96 ", prox=2.5, age=100, gap=0.15, disp=0.3, rr=3.0, temporal=96,  zone_gap=8.0),
+    dict(label="ZG10-T96", prox=2.5, age=100, gap=0.10, disp=0.2, rr=3.0, temporal=96,  zone_gap=10.0),
 ]
 
 
@@ -135,6 +136,22 @@ def calc_pnl(direction: str, open_p: float, close_p: float,
     return round(pips * eff_pv * lot, 2)
 
 
+def update_breakeven(trade: Trade, high: float, low: float, idx: int) -> None:
+    """Geser SL ke entry setelah profit 1R (break-even stop)."""
+    if idx <= trade.open_idx:
+        return
+    if trade.direction == "BUY":
+        sl_dist = trade.open_price - trade.sl_price
+        if sl_dist > 0 and high >= trade.open_price + sl_dist:
+            if trade.sl_price < trade.open_price:
+                trade.sl_price = round(trade.open_price, 5)
+    else:
+        sl_dist = trade.sl_price - trade.open_price
+        if sl_dist > 0 and low <= trade.open_price - sl_dist:
+            if trade.sl_price > trade.open_price:
+                trade.sl_price = round(trade.open_price, 5)
+
+
 def update_trailing(trade: Trade, high: float, low: float, idx: int) -> None:
     if idx <= trade.open_idx:
         return
@@ -159,17 +176,42 @@ def update_trailing(trade: Trade, high: float, low: float, idx: int) -> None:
 
 # ── Patch module globals (untuk sweep tanpa restart proses) ───────────────────
 
-def patch_params(prox: float, age: int, gap: float, disp: float, rr: float, temporal: int) -> None:
-    _bpr_mod.BPR_PROXIMITY_ATR      = prox
-    _bpr_mod.BPR_MAX_AGE_BARS       = age
-    _bpr_mod.BPR_MIN_GAP_ATR        = gap
-    _bpr_mod.BPR_DISPLACEMENT_RATIO = disp
-    _bpr_mod.BPR_RR                 = rr
-    _bpr_mod.BPR_MAX_TEMPORAL_GAP   = temporal
-    _bpr_mod.BPR_HTF_TREND_FILTER   = False   # M15 only — matikan HTF filter
+def patch_params(prox: float, age: int, gap: float, disp: float, rr: float,
+                 temporal: int, zone_gap: float,
+                 rsi_filter: bool = False,
+                 rsi_buy_max: float = 55.0, rsi_sell_min: float = 45.0,
+                 adx_filter: bool = False,
+                 adx_period: int = 14, adx_min: float = 20.0) -> None:
+    _bpr_mod.BPR_PROXIMITY_ATR           = prox
+    _bpr_mod.BPR_MAX_AGE_BARS            = age
+    _bpr_mod.BPR_MIN_GAP_ATR             = gap
+    _bpr_mod.BPR_DISPLACEMENT_RATIO      = disp
+    _bpr_mod.BPR_RR                      = rr
+    _bpr_mod.BPR_MAX_TEMPORAL_GAP        = temporal
+    _bpr_mod.BPR_MAX_ZONE_GAP_ATR_PAIRS  = {"XAUUSD": zone_gap}
+    _bpr_mod.BPR_RSI_FILTER              = rsi_filter
+    _bpr_mod.BPR_RSI_BUY_MAX             = rsi_buy_max
+    _bpr_mod.BPR_RSI_SELL_MIN            = rsi_sell_min
+    _bpr_mod.BPR_ADX_FILTER              = adx_filter
+    _bpr_mod.BPR_ADX_PERIOD              = adx_period
+    _bpr_mod.BPR_ADX_MIN                 = adx_min
+    _bpr_mod.BPR_HTF_TREND_FILTER        = False   # M15 only — matikan HTF filter
 
 
 # ── Backtest core ──────────────────────────────────────────────────────────────
+
+def _build_ema_trend(records: list[dict], ema_period: int = 50) -> list[str | None]:
+    """Hitung EMA trend untuk setiap bar. BUY=close>EMA, SELL=close<EMA, None=warmup."""
+    closes = pd.Series([r["close"] for r in records])
+    ema    = ta.trend.ema_indicator(closes, window=ema_period)
+    result: list[str | None] = []
+    for i, (c, e) in enumerate(zip(closes, ema)):
+        if pd.isna(e):
+            result.append(None)
+        else:
+            result.append("BUY" if c > e else "SELL")
+    return result
+
 
 def run_backtest(
     records: list[dict],
@@ -180,9 +222,14 @@ def run_backtest(
     step: int,
     no_cb: bool,
     label: str = "",
+    ema_trend_filter: bool = False,
+    ema_period: int = 50,
+    session_filter: bool = False,
+    use_be: bool = False,
 ) -> tuple[list[Trade], list[float], float]:
 
     bpr       = StrategyBPR()   # fresh instance — baca globals yang sudah di-patch
+    ema_trend = _build_ema_trend(records, ema_period) if ema_trend_filter else None
     state     = BtState(equity=initial_equity, equity_peak=initial_equity)
     closed:   list[Trade] = []
     eq_curve: list[float] = []
@@ -227,6 +274,8 @@ def run_backtest(
         for trade in state.open_trades:
             if use_trail:
                 update_trailing(trade, high, low, i)
+            elif use_be:
+                update_breakeven(trade, high, low, i)
             hit_sl = (trade.direction == "BUY"  and low  <= trade.sl_price) or \
                      (trade.direction == "SELL" and high >= trade.sl_price)
             hit_tp = (trade.direction == "BUY"  and high >= trade.tp_price) or \
@@ -262,6 +311,12 @@ def run_backtest(
         if (i - WARMUP) % step != 0:
             continue
 
+        # Session filter: London 08-12 GMT, NY 13-18 GMT
+        if session_filter:
+            h = current["time"].hour
+            if not (8 <= h < 12 or 13 <= h < 18):
+                continue
+
         # 4. Buat slice M15 saja — tidak ada H4 (htf_trend=None → BUY+SELL keduanya aktif)
         m15_slice = records[max(0, i - WARMUP + 1): i + 1]
 
@@ -272,6 +327,12 @@ def run_backtest(
 
         if not sig.is_active or sig.sl_distance <= 0:
             continue
+
+        # EMA trend filter: skip sinyal counter-trend
+        if ema_trend is not None:
+            trend = ema_trend[i]
+            if trend is not None and sig.direction != trend:
+                continue
         if sig.sl_distance < min_sl:
             continue
 
@@ -345,22 +406,22 @@ def print_sweep_summary(results: list[tuple[dict, list[Trade]]]) -> None:
     print("\n" + "=" * 72)
     print("  SWEEP SUMMARY — BPR XAUUSD M15 (tanpa HTF filter)")
     print("=" * 72)
-    print(f"  {'Label':<10} {'prox':>5} {'age':>4} {'gap':>5} {'disp':>5} {'RR':>4} "
+    print(f"  {'Label':<10} {'prox':>5} {'age':>4} {'gap':>5} {'disp':>5} {'RR':>4} {'ZG':>5} "
           f"{'#':>4} {'WR%':>6} {'PF':>5} {'Ret%':>7}  Verdict")
-    print("  " + "-" * 72)
+    print("  " + "-" * 78)
     for cfg, trades in results:
         s = _stats(trades)
         pf_s = f"{s['pf']:.2f}" if s['pf'] != float("inf") else " inf"
         if s['n'] < 5:
             verdict = "data kurang"
         elif s['pf'] >= 1.5 and s['wr'] >= 38:
-            verdict = "BAIK ✓"
+            verdict = "BAIK **"
         elif s['pf'] >= 1.0 and s['wr'] >= 30:
             verdict = "OK"
         else:
             verdict = "buruk"
         print(f"  {cfg['label']:<10} {cfg['prox']:>5.1f} {cfg['age']:>4} "
-              f"{cfg['gap']:>5.2f} {cfg['disp']:>5.1f} {cfg['rr']:>4.1f} "
+              f"{cfg['gap']:>5.2f} {cfg['disp']:>5.1f} {cfg['rr']:>4.1f} {cfg['zone_gap']:>5.1f} "
               f"{s['n']:>4} {s['wr']:>5.1f}% {pf_s:>5} {s['ret']:>+6.2f}%  {verdict}")
     print("=" * 72)
 
@@ -480,11 +541,34 @@ def main():
     parser.add_argument("--sweep",              action="store_true",
                         help="Bandingkan 4 kombinasi parameter (step=4 otomatis)")
     # Override manual parameter
-    parser.add_argument("--prox",   type=float, default=2.0)
-    parser.add_argument("--age",    type=int,   default=80)
-    parser.add_argument("--gap",    type=float, default=0.30)
-    parser.add_argument("--disp",   type=float, default=0.5)
-    parser.add_argument("--rr",     type=float, default=3.0)
+    parser.add_argument("--prox",     type=float, default=2.0)
+    parser.add_argument("--age",      type=int,   default=80)
+    parser.add_argument("--gap",      type=float, default=0.30)
+    parser.add_argument("--disp",     type=float, default=0.5)
+    parser.add_argument("--rr",       type=float, default=3.0)
+    parser.add_argument("--temporal", type=int,   default=48)
+    parser.add_argument("--zone-gap",  type=float, default=8.0,
+                        help="Near-BPR: max gap antar FVG dalam ATR (default 8.0 untuk XAUUSD)")
+    parser.add_argument("--session-filter",            action="store_true",
+                        help="Hanya trade saat London 08-12 GMT & NY 13-18 GMT")
+    parser.add_argument("--ema-filter",              action="store_true",
+                        help="Filter sinyal counter-trend dengan EMA M15")
+    parser.add_argument("--ema-period",  type=int,  default=50,
+                        help="Period EMA untuk trend filter (default 50)")
+    parser.add_argument("--rsi-filter",              action="store_true",
+                        help="Konfirmasi RSI sebelum entry LIMIT")
+    parser.add_argument("--rsi-buy-max",  type=float, default=55.0,
+                        help="BUY: tolak jika RSI >= nilai ini (default 55)")
+    parser.add_argument("--rsi-sell-min", type=float, default=45.0,
+                        help="SELL: tolak jika RSI <= nilai ini (default 45)")
+    parser.add_argument("--adx-filter",               action="store_true",
+                        help="Hanya trade saat ADX > threshold (pasar trending)")
+    parser.add_argument("--adx-period",   type=int,   default=14,
+                        help="Period ADX (default 14)")
+    parser.add_argument("--adx-min",      type=float, default=20.0,
+                        help="Minimum ADX untuk entry (default 20.0)")
+    parser.add_argument("--be",                        action="store_true",
+                        help="Aktifkan break-even stop (default: OFF)")
     args = parser.parse_args()
 
     # Cari CSV
@@ -515,17 +599,25 @@ def main():
     no_cb   = args.no_circuit_breaker
 
     if args.sweep:
-        step = 4   # lebih cepat untuk sweep
+        step = 16  # lebih cepat untuk sweep
         print(f"\nMode SWEEP — {len(SWEEP_CONFIGS)} kombinasi | step={step} | "
               f"trail={'ON' if args.trail else 'OFF'} | HTF filter: OFF (M15 only)\n")
         sweep_results = []
         for cfg in SWEEP_CONFIGS:
-            patch_params(cfg['prox'], cfg['age'], cfg['gap'], cfg['disp'], cfg['rr'], cfg['temporal'])
+            patch_params(cfg['prox'], cfg['age'], cfg['gap'], cfg['disp'],
+                         cfg['rr'], cfg['temporal'], cfg['zone_gap'],
+                         rsi_filter=args.rsi_filter,
+                         rsi_buy_max=args.rsi_buy_max, rsi_sell_min=args.rsi_sell_min,
+                         adx_filter=args.adx_filter,
+                         adx_period=args.adx_period, adx_min=args.adx_min)
             print(f"  [{cfg['label'].strip()}] prox={cfg['prox']} age={cfg['age']} "
-                  f"gap={cfg['gap']} disp={cfg['disp']} RR={cfg['rr']}")
+                  f"gap={cfg['gap']} disp={cfg['disp']} RR={cfg['rr']} zone_gap={cfg['zone_gap']}")
             trades, eq_curve, final_eq = run_backtest(
                 records, total, args.equity, args.pipval,
                 use_trail=args.trail, step=step, no_cb=no_cb, label=cfg['label'].strip(),
+                ema_trend_filter=args.ema_filter, ema_period=args.ema_period,
+                session_filter=args.session_filter,
+                use_be=args.be,
             )
             sweep_results.append((cfg, trades))
 
@@ -544,24 +636,46 @@ def main():
 
         if best:
             cfg, trades = best
-            patch_params(cfg['prox'], cfg['age'], cfg['gap'], cfg['disp'], cfg['rr'], cfg['temporal'])
+            patch_params(cfg['prox'], cfg['age'], cfg['gap'], cfg['disp'],
+                         cfg['rr'], cfg['temporal'], cfg['zone_gap'],
+                         rsi_filter=args.rsi_filter,
+                         rsi_buy_max=args.rsi_buy_max, rsi_sell_min=args.rsi_sell_min,
+                         adx_filter=args.adx_filter,
+                         adx_period=args.adx_period, adx_min=args.adx_min)
             _, eq_curve, final_eq = run_backtest(
                 records, total, args.equity, args.pipval,
                 use_trail=args.trail, step=1, no_cb=no_cb, label="BEST-detail",
+                ema_trend_filter=args.ema_filter, ema_period=args.ema_period,
+                session_filter=args.session_filter,
+                use_be=args.be,
             )
             print(f"\n--- Detail combo terbaik ({cfg['label'].strip()}) dengan step=1 ---")
             print_report(trades, args.equity, final_eq, eq_curve, cfg, save_json=True)
 
     else:
         cfg = dict(label="custom", prox=args.prox, age=args.age,
-                   gap=args.gap, disp=args.disp, rr=args.rr)
-        patch_params(cfg['prox'], cfg['age'], cfg['gap'], cfg['disp'], cfg['rr'], cfg['temporal'])
+                   gap=args.gap, disp=args.disp, rr=args.rr,
+                   temporal=args.temporal, zone_gap=args.zone_gap)
+        patch_params(cfg['prox'], cfg['age'], cfg['gap'], cfg['disp'],
+                     cfg['rr'], cfg['temporal'], cfg['zone_gap'],
+                     rsi_filter=args.rsi_filter,
+                     rsi_buy_max=args.rsi_buy_max, rsi_sell_min=args.rsi_sell_min,
+                     adx_filter=args.adx_filter,
+                     adx_period=args.adx_period, adx_min=args.adx_min)
+        rsi_label = (f"ON (RSI<{args.rsi_buy_max}/>{args.rsi_sell_min})"
+                     if args.rsi_filter else "OFF")
+        adx_label = (f"ON (>{args.adx_min})" if args.adx_filter else "OFF")
         print(f"\nBPR M15 only | prox={cfg['prox']} age={cfg['age']} gap={cfg['gap']} "
-              f"disp={cfg['disp']} RR={cfg['rr']} | step={args.step} | "
-              f"trail={'ON' if args.trail else 'OFF'} | HTF filter: OFF\n")
+              f"disp={cfg['disp']} RR={cfg['rr']} zone_gap={cfg['zone_gap']} | step={args.step} | "
+              f"trail=OFF | BE: {'ON' if args.be else 'OFF'} | "
+              f"EMA: {'ON('+str(args.ema_period)+')' if args.ema_filter else 'OFF'} | "
+              f"RSI: {rsi_label} | ADX: {adx_label} | HTF: OFF\n")
         trades, eq_curve, final_eq = run_backtest(
             records, total, args.equity, args.pipval,
-            use_trail=args.trail, step=args.step, no_cb=no_cb,
+            use_trail=False, step=args.step, no_cb=no_cb,
+            ema_trend_filter=args.ema_filter, ema_period=args.ema_period,
+            session_filter=args.session_filter,
+            use_be=args.be,
         )
         print_report(trades, args.equity, final_eq, eq_curve, cfg)
 

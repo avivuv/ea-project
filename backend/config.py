@@ -356,7 +356,7 @@ BUMI_RR           = float(os.getenv("BUMI_RR", "4.0"))                         #
 BUMI_LOOKBACK     = int(os.getenv("BUMI_LOOKBACK", "3"))                        # candle lookback cek cross
 
 # ── Strategy BPR — Balanced Price Range (M15) ────────────────────────────────
-BPR_ENABLED            = os.getenv("BPR_ENABLED", "true").lower() == "true"
+BPR_ENABLED            = os.getenv("BPR_ENABLED", "false").lower() == "true"
 BPR_LOOKBACK           = int(os.getenv("BPR_LOOKBACK", "100"))        # M15 bars discan (≈25 jam)
 BPR_MIN_GAP_ATR        = float(os.getenv("BPR_MIN_GAP_ATR", "0.3"))   # ukuran FVG minimum (N × ATR)
 BPR_PROXIMITY_ATR      = float(os.getenv("BPR_PROXIMITY_ATR", "1.5")) # jarak max price ke zona (N × ATR)
@@ -380,6 +380,29 @@ for _item in os.getenv("BPR_MIN_GAP_ATR_PAIRS", "USDJPY:0.5,EURUSD:0.4,GBPUSD:0.
     if ":" in _item:
         _k, _v = _item.split(":", 1)
         BPR_MIN_GAP_ATR_PAIRS[_k.strip().upper()] = float(_v.strip())
+
+# Near-BPR: bull FVG + sell FVG yang tidak overlap tapi berdekatan (N × ATR)
+# 0 = strict overlap saja | >0 = izinkan gap hingga N×ATR antar FVG
+BPR_MAX_ZONE_GAP_ATR       = float(os.getenv("BPR_MAX_ZONE_GAP_ATR", "0.0"))
+BPR_MAX_ZONE_GAP_ATR_PAIRS: dict[str, float] = {}
+for _item in os.getenv("BPR_MAX_ZONE_GAP_ATR_PAIRS", "XAUUSD:8.0,BTCUSD:10.0").split(","):
+    if ":" in _item:
+        _k, _v = _item.split(":", 1)
+        BPR_MAX_ZONE_GAP_ATR_PAIRS[_k.strip().upper()] = float(_v.strip())
+
+# RSI konfirmasi sebelum entry BPR (hanya untuk LIMIT order)
+# BUY: RSI harus < BPR_RSI_BUY_MAX (belum overbought, masih ada ruang naik)
+# SELL: RSI harus > BPR_RSI_SELL_MIN (belum oversold, masih ada ruang turun)
+BPR_RSI_FILTER    = os.getenv("BPR_RSI_FILTER", "false").lower() == "true"
+BPR_RSI_PERIOD    = int(os.getenv("BPR_RSI_PERIOD", "14"))
+BPR_RSI_BUY_MAX   = float(os.getenv("BPR_RSI_BUY_MAX",  "55.0"))
+BPR_RSI_SELL_MIN  = float(os.getenv("BPR_RSI_SELL_MIN", "45.0"))
+
+# ADX filter — hanya entry saat pasar trending (ADX > threshold)
+# Mencegah entry di market choppy/sideways
+BPR_ADX_FILTER    = os.getenv("BPR_ADX_FILTER", "false").lower() == "true"
+BPR_ADX_PERIOD    = int(os.getenv("BPR_ADX_PERIOD", "14"))
+BPR_ADX_MIN       = float(os.getenv("BPR_ADX_MIN", "20.0"))
 
 # ── Strategy Runner ───────────────────────────────────────────────────────────
 MIN_SIGNAL_CONF     = float(os.getenv("MIN_SIGNAL_CONF", "0.55"))   # sinyal di bawah ini diabaikan sebelum aggregasi
