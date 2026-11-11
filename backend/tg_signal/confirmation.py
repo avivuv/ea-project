@@ -20,22 +20,45 @@ from __future__ import annotations
 
 from typing import Sequence
 
-MODES = ("FVG", "OB", "OBIM", "REJ")
+MODES = ("FVG", "OB", "OBIM", "REJ", "REJ618", "ENG", "ADMIN")
 REJ_WICK_RATIO = 0.5
+
+
+def _rejection(direction, o, h, l, c, k, zero, tol, ratio, need_color=True) -> bool:
+    rng = h[k] - l[k]
+    if k < 0 or rng <= 0:
+        return False
+    if direction == "BUY":
+        return (l[k] <= zero + tol and (c[k] > o[k] or not need_color)
+                and (min(o[k], c[k]) - l[k]) >= ratio * rng)
+    return (h[k] >= zero - tol and (c[k] < o[k] or not need_color)
+            and (h[k] - max(o[k], c[k])) >= ratio * rng)
+
+
+def _engulfing(direction, o, h, l, c, k, zero, tol) -> bool:
+    """Bar k menelan body bar k-1 yang berlawanan warna, dan salah satunya menyentuh zona."""
+    if k < 1:
+        return False
+    if direction == "BUY":
+        return (c[k - 1] < o[k - 1] and c[k] > o[k] and c[k] >= o[k - 1] and o[k] <= c[k - 1]
+                and min(l[k], l[k - 1]) <= zero + tol)
+    return (c[k - 1] > o[k - 1] and c[k] < o[k] and c[k] <= o[k - 1] and o[k] >= c[k - 1]
+            and max(h[k], h[k - 1]) >= zero - tol)
 
 
 def confirmed(mode: str, direction: str, o: Sequence[float], h: Sequence[float],
               l: Sequence[float], c: Sequence[float], k: int, zero: float, tol: float = 0.5) -> bool:
     """True bila bar ke-k (sudah close) memberi konfirmasi `mode` searah `direction`."""
     if mode == "REJ":
-        rng = h[k] - l[k]
-        if k < 0 or rng <= 0:
-            return False
-        if direction == "BUY":
-            return (l[k] <= zero + tol and c[k] > o[k]
-                    and (min(o[k], c[k]) - l[k]) >= REJ_WICK_RATIO * rng)
-        return (h[k] >= zero - tol and c[k] < o[k]
-                and (h[k] - max(o[k], c[k])) >= REJ_WICK_RATIO * rng)
+        return _rejection(direction, o, h, l, c, k, zero, tol, REJ_WICK_RATIO)
+    if mode == "REJ618":        # resep admin: sumbu ≥ 61,8% ukuran candle (warna bebas)
+        return _rejection(direction, o, h, l, c, k, zero, tol, 0.618, need_color=False)
+    if mode == "ENG":
+        return _engulfing(direction, o, h, l, c, k, zero, tol)
+    if mode == "ADMIN":         # salah satu: rejection 61,8% / engulfing / OBIM
+        return (_rejection(direction, o, h, l, c, k, zero, tol, 0.618, need_color=False)
+                or _engulfing(direction, o, h, l, c, k, zero, tol)
+                or confirmed("OBIM", direction, o, h, l, c, k, zero, tol))
     if k < 2:
         return False
     i1, i2, i3 = k - 2, k - 1, k

@@ -316,7 +316,7 @@ def default_variants(include_m5: bool = False) -> list[Variant]:
           for tp in tps]
     vs += [Variant("LAYER", 1, tp, "zone") for tp in tps]
     tfs = (1, 5) if include_m5 else (1,)
-    vs += [Variant(e, tf, tp, sl) for sl in ("entry", "zone") for e in ("FVG", "OB", "OBIM", "REJ")
+    vs += [Variant(e, tf, tp, sl) for sl in ("entry", "zone") for e in ("FVG", "OB", "OBIM", "REJ", "REJ618", "ENG", "ADMIN")
            for tf in tfs for tp in tps]
     return vs
 

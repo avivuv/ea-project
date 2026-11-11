@@ -188,3 +188,18 @@ melewati SL keluar di open) → **−$615**. Aturan kunci sangat sensitif terhad
   dibanding SL/TP tetap (Akun2 vs TP100 tanpa kunci: −$406 vs −$807 dan +$73 vs −$651).
 - Spread sangat menentukan: 0,8 vs 1,7 pips ≈ selisih $35–40 per 660 trade.
 - Entry di pesan "Buy/Sell Now": diuji di panduan → lebih buruk (harga entry lebih jelek).
+
+## Resep konfirmasi admin (topik Edukasi): rejection ≥61,8% / engulfing / OBIM di M1 — 11 Nov 2026
+Konfirmasi dievaluasi di M1 setelah harga menyentuh zona; entry di open bar berikutnya. Agu–Nov 2026, spread asli.
+Avg pips/trade (trade):
+
+| Konfirmasi | TP30 SL entry (hangus +10) | TP30 SL entry (tanpa batas hangus) | TP10 SL zona (hangus +10) |
+|---|---|---|---|
+| Tanpa konfirmasi (EA sekarang) | −1,67 (2.457) | −1,67 | — |
+| Rejection ≥ 61,8% | **−1,32** (410) | −1,46 (1.850) | −2,77 (410) |
+| Engulfing | −4,94 (249) | −2,09 (1.608) | −2,49 (249) |
+| Salah satu (rejection 61,8% / engulfing / OBIM) | −3,10 (493) | −1,83 (2.060) | −2,64 (493) |
+
+Kesimpulan: versi mekanis resep konfirmasi admin **tidak membuat sinyal menguntungkan**; rejection 61,8%
+hanya sedikit lebih baik dari entry langsung. Yang sejauh ini paling memperbaiki hasil adalah
+pengelolaan posisi (kunci +10 → +5 + trailing), bukan konfirmasi entry.
