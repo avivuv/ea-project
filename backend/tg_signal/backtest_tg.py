@@ -102,7 +102,7 @@ class Bars:
 # ── Simulasi ────────────────────────────────────────────────────────────────
 @dataclass(frozen=True)
 class Variant:
-    entry: str          # ZERO | MID | LAST (limit) | LAYER (3 limit) | FVG | OB | OBIM (konfirmasi)
+    entry: str          # MARKET | ZERO | MID | LAST (limit) | LAYER | FVG | OB | OBIM | REJ (konfirmasi)
     tf: int             # 1 | 5 (hanya untuk konfirmasi)
     tp_pips: float
     sl_from: str = "entry"   # entry: SL = entry − SL pips | zone: SL = LAST − SL pips
@@ -114,6 +114,8 @@ class Variant:
             return f"LIMIT_{self.entry}_TP{self.tp_pips:g}_{sl}"
         if self.entry == "LAYER":
             return f"LAYER3_TP{self.tp_pips:g}_SLzone"
+        if self.entry == "MARKET":
+            return f"MARKET_TP{self.tp_pips:g}_{sl}"
         return f"{self.entry}_M{self.tf}_TP{self.tp_pips:g}_{sl}"
 
 
@@ -165,6 +167,11 @@ def simulate(sig: Signal, v: Variant, bars: Bars) -> dict:
     touched = False
     entry_i = None
     entry_px = sl_px = tp_px = 0.0
+    if v.entry == "MARKET":                 # entry langsung di open bar pertama setelah pesan
+        touched, entry_i = True, 0
+        entry_px = o[0] + (spr[0] if is_buy else 0.0)
+        sl_px = (entry_px if v.sl_from == "entry" else min(last, entry_px)) - sl_dist
+        tp_px = entry_px + tp_dist
     for j in range(len(o)):
         fill_cost = spr[j] if is_buy else 0.0           # BUY bayar spread saat masuk
         exit_adj = 0.0 if is_buy else spr[j]            # SELL bayar spread saat keluar
@@ -305,7 +312,8 @@ def summarize(trades: pd.DataFrame) -> pd.DataFrame:
 
 def default_variants(include_m5: bool = False) -> list[Variant]:
     tps = (10, 20, 30)
-    vs = [Variant(e, 1, tp, sl) for sl in ("entry", "zone") for e in ("ZERO", "MID", "LAST") for tp in tps]
+    vs = [Variant(e, 1, tp, sl) for sl in ("entry", "zone") for e in ("MARKET", "ZERO", "MID", "LAST")
+          for tp in tps]
     vs += [Variant("LAYER", 1, tp, "zone") for tp in tps]
     tfs = (1, 5) if include_m5 else (1,)
     vs += [Variant(e, tf, tp, sl) for sl in ("entry", "zone") for e in ("FVG", "OB", "OBIM", "REJ")
@@ -436,7 +444,7 @@ def main() -> None:
 
     variants = default_variants(args.m5)
     if args.bars == "M5":   # pola konfirmasi "M1" tidak bermakna di bar M5
-        variants = [v for v in variants if v.entry in ("ZERO", "MID", "LAST", "LAYER")]
+        variants = [v for v in variants if v.entry in ("MARKET", "ZERO", "MID", "LAST", "LAYER")]
     results = [simulate(sg, v, bars) for v in variants for sg in signals]
     trades = pd.DataFrame(results)
     suffix = "" if args.bars == "M1" else f"_{args.bars.lower()}"

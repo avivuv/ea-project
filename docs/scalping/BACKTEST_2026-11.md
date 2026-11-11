@@ -71,3 +71,21 @@ Candle searah sinyal dengan sumbu ≥ 50% range yang menyentuh zona (`REJ`).
 | REJ / TP10 / SL entry (tanpa batas hangus) | 24,8 | 66,4% | −3,45 | — |
 
 Juga negatif, bahkan tanpa spread. Melonggarkan batas hangus hanya menambah jumlah trade rugi.
+
+## Tambahan: entry market saat sinyal diterima (admin posting SETELAH pasang posisi)
+Info dari user: admin mengirim sinyal setelah ia sendiri entry. Hari 11 Nov 2026 mendukung ini —
+10 dari 22 sinyal sudah bergerak ≥10 pips searah sinyal sebelum menyentuh zona, dan dilaporkan TP/"INSTAN".
+
+| Variasi `MARKET` (M1, Agu–Nov 2026, 2.457 trade) | WR | Avg pips | Tanpa spread |
+|---|---|---|---|
+| TP10 / SL zona | 85,8% | −2,12 | −0,56 |
+| TP10 / SL 30 dari entry | 69,8% | −2,10 | −0,73 |
+| TP30 / SL 30 dari entry | 47,2% | −1,67 | +0,18 |
+
+- Hari 11 Nov: MARKET TP10 SL zona = **21 TP / 1 SL, +143 pips** — tapi dari 73 hari, hanya 30 positif;
+  median −78 pips/hari. Hari terburuk −615 pips (24 Agu).
+- M5 Okt 2025 – Jul 2026: sama negatifnya dengan periode kalibrasi.
+- Scan fitur saat sinyal (`features.py`: jarak ke zona, momentum 5/15 menit, posisi vs EMA20 M1,
+  tren EMA20/50 M5, RSI, ATR, warna candle terakhir, jam): **tidak ada yang positif konsisten tiap bulan.**
+  Jam 10, 13, 14 WIB terlihat positif secara total tapi negatif di salah satu bulan → kemungkinan kebetulan.
+- Catatan: entry admin terjadi *sebelum* pesan dikirim, di harga yang lebih baik dari yang bisa kita dapat.

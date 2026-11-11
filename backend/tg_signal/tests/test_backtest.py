@@ -87,3 +87,11 @@ def test_confirmation_rejection_candle():
     assert not confirmed("REJ", "BUY", [9.7], [9.8], [9.0], [9.6], 0, zero=9.1)
     # SELL mirror: high 10.0 di zona, close < open, sumbu atas 0.6
     assert confirmed("REJ", "SELL", [9.4], [10.0], [9.2], [9.3], 0, zero=9.9)
+
+
+def test_market_entry_tp_before_zone():
+    # SELL 42-46, ref 4041.8 (di bawah zona); entry 4041.6 lalu turun 1.0+ tanpa menyentuh 4042
+    bars = make_bars([4041.8, 4041.6, 4041.2, 4040.4])
+    r = simulate(sig("SELL", 42, 46), Variant("MARKET", 1, 10), bars)
+    assert (r["outcome"], r["pips"]) == ("TP", 10)
+    assert simulate(sig("SELL", 42, 46), Variant("ZERO", 1, 10), bars)["outcome"] == "NOT_TOUCHED"
