@@ -66,12 +66,21 @@ TG_ZONE_WIDTH_MIN = _f("TG_ZONE_WIDTH_MIN", 1)
 TG_ZONE_WIDTH_MAX = _f("TG_ZONE_WIDTH_MAX", 10)
 TG_DUPLICATE_WINDOW_SEC = _i("TG_DUPLICATE_WINDOW_SEC", 300)
 
-# ── Risk (dipakai Tahap 3+) ─────────────────────────────────────────────────
+# ── Eksekusi (Tahap 4, akun demo) ───────────────────────────────────────────
+TG_ENTRY_MODE = os.getenv("TG_ENTRY_MODE", "MARKET")    # entry market saat sinyal diterima
+TG_TP_PIPS = _f("TG_TP_PIPS", 30)                       # TP = SL = 30 pips (keputusan user)
+TG_SL_FROM = os.getenv("TG_SL_FROM", "entry")           # entry | zone (LAST − SL)
+TG_MAGIC = _i("TG_MAGIC", 990011)                       # penanda order milik program ini
+TG_DEVIATION_POINTS = _i("TG_DEVIATION_POINTS", 50)     # toleransi slippage (50 point = $0.05)
+PAUSE_FILE = DATA_DIR / "PAUSE"                         # kill switch: file ada → tidak buka order
+
+# ── Risk ────────────────────────────────────────────────────────────────────
 TG_LOT = _f("TG_LOT", 0.01)
 TG_MAX_POSITIONS = _i("TG_MAX_POSITIONS", 1)
-TG_MAX_TRADES_DAY = _i("TG_MAX_TRADES_DAY", 10)
-TG_DAILY_LOSS_USD = _f("TG_DAILY_LOSS_USD", 10.0)
+TG_MAX_TRADES_DAY = _i("TG_MAX_TRADES_DAY", 40)
+TG_DAILY_LOSS_USD = _f("TG_DAILY_LOSS_USD", 30.0)
 TG_MAX_SPREAD_PIPS = _f("TG_MAX_SPREAD_PIPS", 5)
+TG_DAY_TZ_HOURS = 7                                     # hari trading dihitung WIB
 
 
 def pips_to_price(pips: float) -> float:

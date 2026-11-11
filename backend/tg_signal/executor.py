@@ -1,0 +1,170 @@
+"""
+Eksekusi order di MT5 via library MetaTrader5.
+
+PENGAMAN: koneksi DITOLAK bila akun yang login bukan akun DEMO (RULES §1).
+Mode LIVE belum didukung sama sekali di program ini.
+
+    python -m tg_signal.executor --check     # cek akun, algo trading, simbol, harga
+"""
+from __future__ import annotations
+
+import argparse
+import time
+from dataclasses import dataclass
+from datetime import datetime, timezone
+
+import MetaTrader5 as mt5
+
+from tg_signal import settings
+
+
+@dataclass
+class Tick:
+    bid: float
+    ask: float
+    time: datetime
+
+    @property
+    def spread(self) -> float:
+        return self.ask - self.bid
+
+    @property
+    def age_sec(self) -> float:
+        return (datetime.now(timezone.utc) - self.time).total_seconds()
+
+
+@dataclass
+class Fill:
+    ticket: int
+    price: float
+    sl: float
+    tp: float
+    time: datetime
+
+
+@dataclass
+class Closed:
+    exit_price: float
+    profit_usd: float
+    time: datetime
+    reason: str          # TP | SL | MANUAL | OTHER
+
+
+class MT5Executor:
+    def __init__(self, symbol: str = settings.SYMBOL):
+        self.symbol = symbol
+        self.info = None
+
+    # ── koneksi ─────────────────────────────────────────────────────────────
+    def connect(self) -> None:
+        if not mt5.initialize():
+            raise RuntimeError(f"MT5 initialize gagal: {mt5.last_error()}")
+        acc = mt5.account_info()
+        if acc is None:
+            raise RuntimeError("MT5 belum login ke akun")
+        if acc.trade_mode != mt5.ACCOUNT_TRADE_MODE_DEMO:
+            mt5.shutdown()
+            raise RuntimeError(f"DITOLAK: akun {acc.login} bukan akun DEMO. Program ini hanya untuk demo.")
+        if not mt5.symbol_select(self.symbol, True):
+            raise RuntimeError(f"Simbol {self.symbol} tidak tersedia")
+        self.info = mt5.symbol_info(self.symbol)
+
+    def status(self) -> dict:
+        acc, term = mt5.account_info(), mt5.terminal_info()
+        return {
+            "login": acc.login, "server": acc.server, "demo": acc.trade_mode == mt5.ACCOUNT_TRADE_MODE_DEMO,
+            "balance": acc.balance, "equity": acc.equity, "currency": acc.currency,
+            "connected": term.connected, "algo_trading": term.trade_allowed,
+            "account_trade_allowed": acc.trade_allowed,
+        }
+
+    def shutdown(self) -> None:
+        mt5.shutdown()
+
+    # ── harga ───────────────────────────────────────────────────────────────
+    def tick(self) -> Tick:
+        t = mt5.symbol_info_tick(self.symbol)
+        if t is None:
+            raise RuntimeError(f"Tidak ada tick: {mt5.last_error()}")
+        # time_msc = jam server (Exness UTC+0); dikoreksi offset bila ada
+        ts = datetime.fromtimestamp(t.time_msc / 1000 - settings.MT5_UTC_OFFSET_H * 3600, timezone.utc)
+        return Tick(t.bid, t.ask, ts)
+
+    # ── order ───────────────────────────────────────────────────────────────
+    def _filling(self) -> int:
+        fm = self.info.filling_mode
+        if fm & 1:
+            return mt5.ORDER_FILLING_FOK
+        if fm & 2:
+            return mt5.ORDER_FILLING_IOC
+        return mt5.ORDER_FILLING_RETURN
+
+    def open_market(self, direction: str, lot: float, sl_price_dist: float, tp_price_dist: float,
+                    zone_last: float | None, sl_from: str, comment: str) -> Fill:
+        """Order market dengan SL & TP wajib (RULES §4). Jarak dalam satuan harga."""
+        tk = mt5.symbol_info_tick(self.symbol)
+        d = self.info.digits
+        if direction == "BUY":
+            price = tk.ask
+            base = price if sl_from == "entry" or zone_last is None else min(zone_last, price)
+            sl, tp, otype = base - sl_price_dist, price + tp_price_dist, mt5.ORDER_TYPE_BUY
+        else:
+            price = tk.bid
+            base = price if sl_from == "entry" or zone_last is None else max(zone_last, price)
+            sl, tp, otype = base + sl_price_dist, price - tp_price_dist, mt5.ORDER_TYPE_SELL
+        req = {
+            "action": mt5.TRADE_ACTION_DEAL, "symbol": self.symbol, "volume": float(lot),
+            "type": otype, "price": round(price, d), "sl": round(sl, d), "tp": round(tp, d),
+            "deviation": settings.TG_DEVIATION_POINTS, "magic": settings.TG_MAGIC,
+            "comment": comment[:31], "type_time": mt5.ORDER_TIME_GTC, "type_filling": self._filling(),
+        }
+        res = mt5.order_send(req)
+        if res is None or res.retcode != mt5.TRADE_RETCODE_DONE:
+            code = None if res is None else res.retcode
+            msg = mt5.last_error() if res is None else res.comment
+            raise RuntimeError(f"order_send gagal (retcode={code}): {msg}")
+        pos = mt5.positions_get(ticket=res.order)
+        p = pos[0] if pos else None
+        return Fill(ticket=res.order, price=p.price_open if p else res.price,
+                    sl=p.sl if p else req["sl"], tp=p.tp if p else req["tp"],
+                    time=datetime.now(timezone.utc))
+
+    def open_tickets(self) -> set[int]:
+        pos = mt5.positions_get(symbol=self.symbol) or ()
+        return {p.ticket for p in pos if p.magic == settings.TG_MAGIC}
+
+    def closed_info(self, ticket: int) -> Closed | None:
+        deals = mt5.history_deals_get(position=ticket) or ()
+        out = [d for d in deals if d.entry == mt5.DEAL_ENTRY_OUT]
+        if not out:
+            return None
+        d = out[-1]
+        profit = sum(x.profit + x.commission + x.swap + getattr(x, "fee", 0.0) for x in deals)
+        reason = {mt5.DEAL_REASON_TP: "TP", mt5.DEAL_REASON_SL: "SL"}.get(d.reason, "MANUAL"
+                                                                           if d.reason == mt5.DEAL_REASON_CLIENT
+                                                                           else "OTHER")
+        return Closed(d.price, round(profit, 2), datetime.fromtimestamp(d.time, timezone.utc), reason)
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser(description="Cek koneksi eksekusi MT5")
+    ap.add_argument("--check", action="store_true")
+    ap.parse_args()
+    ex = MT5Executor()
+    ex.connect()
+    try:
+        st = ex.status()
+        for k, v in st.items():
+            print(f"  {k:<22}: {v}")
+        tk = ex.tick()
+        print(f"  {ex.symbol} bid/ask         : {tk.bid} / {tk.ask} (spread {tk.spread / settings.PIP_SIZE:.1f} pips,"
+              f" umur {tk.age_sec:.0f} dtk)")
+        print(f"  filling mode            : {ex.info.filling_mode} | volume_min {ex.info.volume_min}")
+        if not st["algo_trading"]:
+            print("\n  ⚠️  Tombol 'Algo Trading' di MT5 MATI — nyalakan supaya order bisa dikirim.")
+    finally:
+        ex.shutdown()
+
+
+if __name__ == "__main__":
+    main()

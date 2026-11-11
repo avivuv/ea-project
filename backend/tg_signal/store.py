@@ -63,6 +63,24 @@ CREATE TABLE IF NOT EXISTS report_lines (
     UNIQUE (message_id, seq)
 );
 
+CREATE TABLE IF NOT EXISTS trades (
+    id          INTEGER PRIMARY KEY,
+    signal_id   INTEGER NOT NULL REFERENCES signals(id),
+    mode        TEXT    NOT NULL,              -- LOG | DEMO
+    ticket      INTEGER,
+    direction   TEXT    NOT NULL,
+    lot         REAL    NOT NULL,
+    open_utc    TEXT    NOT NULL,
+    entry       REAL    NOT NULL,
+    sl          REAL    NOT NULL,
+    tp          REAL    NOT NULL,
+    close_utc   TEXT,
+    exit        REAL,
+    profit_usd  REAL,
+    pips        REAL,
+    outcome     TEXT                           -- TP | SL | MANUAL | OTHER
+);
+
 CREATE INDEX IF NOT EXISTS idx_signals_status ON signals(status);
 CREATE INDEX IF NOT EXISTS idx_report_date ON report_lines(report_date);
 """
@@ -173,8 +191,57 @@ class Store:
         )
         self.conn.commit()
 
+    def signal_for_message(self, chat_id: int, msg_id: int) -> sqlite3.Row | None:
+        return self.conn.execute(
+            """SELECT s.* FROM signals s JOIN messages m ON m.id = s.message_id
+               WHERE m.chat_id=? AND m.msg_id=?""", (chat_id, msg_id)).fetchone()
+
+    def recent_duplicate(self, sig: sqlite3.Row, window_sec: int) -> bool:
+        """Sinyal arah+zona sama yang sudah diproses dalam `window_sec` detik terakhir."""
+        since = (datetime.fromisoformat(sig["received_utc"]).timestamp() - window_sec)
+        rows = self.conn.execute(
+            """SELECT received_utc FROM signals WHERE id != ? AND direction=? AND level_first=?
+               AND level_last=? AND status != 'NEW'""",
+            (sig["id"], sig["direction"], sig["level_first"], sig["level_last"])).fetchall()
+        return any(datetime.fromisoformat(r[0]).timestamp() >= since for r in rows)
+
+    def set_zone(self, signal_id: int, ref: float, zero: float, last: float, flags: list[str]) -> None:
+        self.conn.execute("UPDATE signals SET ref_price=?, zero=?, last=?, flags=? WHERE id=?",
+                          (ref, zero, last, ",".join(flags), signal_id))
+        self.conn.commit()
+
+    # ── trades ──────────────────────────────────────────────────────────────
+    def add_trade(self, signal_id: int, mode: str, ticket: int | None, direction: str, lot: float,
+                  open_time: datetime, entry: float, sl: float, tp: float) -> int:
+        cur = self.conn.execute(
+            """INSERT INTO trades (signal_id, mode, ticket, direction, lot, open_utc, entry, sl, tp)
+               VALUES (?,?,?,?,?,?,?,?,?)""",
+            (signal_id, mode, ticket, direction, lot, utc_iso(open_time), entry, sl, tp))
+        self.conn.commit()
+        return cur.lastrowid
+
+    def open_trades(self, mode: str | None = None) -> list[sqlite3.Row]:
+        q = "SELECT * FROM trades WHERE close_utc IS NULL" + (" AND mode=?" if mode else "")
+        return self.conn.execute(q, (mode,) if mode else ()).fetchall()
+
+    def close_trade(self, trade_id: int, close_time: datetime, exit_price: float,
+                    profit_usd: float, pips: float, outcome: str) -> None:
+        self.conn.execute(
+            "UPDATE trades SET close_utc=?, exit=?, profit_usd=?, pips=?, outcome=? WHERE id=?",
+            (utc_iso(close_time), exit_price, profit_usd, round(pips, 1), outcome, trade_id))
+        self.conn.commit()
+
+    def day_stats(self, day_start_utc: datetime, mode: str) -> tuple[int, float]:
+        """(jumlah trade dibuka, profit bersih USD trade yang sudah tutup) sejak awal hari."""
+        r = self.conn.execute(
+            """SELECT COUNT(*), COALESCE(SUM(profit_usd), 0) FROM trades
+               WHERE mode=? AND open_utc >= ?""", (mode, utc_iso(day_start_utc))).fetchone()
+        return int(r[0]), float(r[1])
+
     def reset_derived(self) -> None:
         """Hapus tabel turunan (sinyal, event, laporan) supaya bisa di-parse ulang dari messages."""
+        if self.conn.execute("SELECT COUNT(*) FROM trades").fetchone()[0]:
+            raise RuntimeError("Sudah ada data trade — reparse dibatalkan supaya riwayat trade tidak rusak.")
         self.conn.executescript(
             "DROP TABLE IF EXISTS signal_events; DROP TABLE IF EXISTS signals;"
             " DROP TABLE IF EXISTS report_lines;"
