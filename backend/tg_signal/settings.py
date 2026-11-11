@@ -5,9 +5,17 @@ Aturan lengkap: docs/scalping/RULES.md
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 
 from dotenv import load_dotenv
+
+# Output CLI selalu UTF-8 (Windows default cp1252 gagal mencetak →, ✅, ❌)
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8")
+    except (AttributeError, ValueError):
+        pass
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BACKEND_DIR / ".env")
@@ -36,6 +44,10 @@ TG_TOPIC_ID = int(os.getenv("TG_TOPIC_ID", "1090") or 0)
 # ── Instrumen ───────────────────────────────────────────────────────────────
 SYMBOL = os.getenv("TG_SYMBOL", "XAUUSD")
 PIP_SIZE = 0.10                                 # 1 pip XAUUSD = $0.10 harga (keputusan D4)
+USD_PER_PIP_001 = 0.10                          # 0.01 lot × 100 oz × $0.10
+# Offset jam server MT5 terhadap UTC (Exness = 0). Bar MT5 dikonversi ke UTC.
+MT5_UTC_OFFSET_H = _f("MT5_UTC_OFFSET_H", 0)
+M1_CACHE_PATH = DATA_DIR / f"m1_{SYMBOL}.csv.gz"
 
 # ── Mode ────────────────────────────────────────────────────────────────────
 TG_MODE = os.getenv("TG_MODE", "LOG").upper()   # LOG | DEMO | LIVE

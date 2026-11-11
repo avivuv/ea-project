@@ -1,6 +1,6 @@
 # Plan — Telegram Signal Scalper (XAUUSD)
 
-Branch: `scalping` · Bahasa: **full Python** · Status: **Tahap 1 selesai → lanjut Tahap 2 (backtest)**
+Branch: `scalping` · Bahasa: **full Python** · Status: **Tahap 2 — backtest negatif, menunggu keputusan arah**
 
 Program yang membaca sinyal scalping XAUUSD dari grup Telegram, menunggu konfirmasi
 FVG/OB di M1/M5, lalu mengeksekusi order di MT5 — dengan dashboard web untuk monitoring.
@@ -91,17 +91,21 @@ backend/tg_signal/
 - Topik hanya diisi admin bertanda tangan (Admin 1/2/3/2+1/4) — tidak perlu filter pengirim
 
 ### Tahap 2 — Backtest & validasi
-- [ ] Ambil data M1 XAUUSD dari MT5 untuk rentang tanggal riwayat sinyal
-- [ ] `backtest_tg.py` dengan variasi:
-  - Entry: tepi zona langsung / FVG / OB / OBIM (FVG+OB)
-  - Konfirmasi di M1 vs M5
-  - TP: 10 / 20 / 30 pips / partial 50% @10 + BE + sisa @30
-  - Spread & slippage realistis
-- [ ] Cocokkan hasil simulasi dengan label laporan (ZERO/MID/LAST) → konfirmasi arti label
-- [ ] Laporan: win rate, profit factor, max drawdown, expectancy per variasi
+- [~] Ambil data M1 XAUUSD dari MT5 — `market_data.py`; baru tersedia 31 Jul – 11 Nov 2026
+- [ ] (User) Unduh histori M1 Okt 2025 – Jul 2026 di MT5, lalu jalankan ulang backtest
+- [x] `backtest_tg.py` dengan variasi:
+  - Entry: limit ZERO / MID / LAST / layer 3, konfirmasi FVG / OB / OBIM
+  - Konfirmasi di M1 (M5 via `--m5`; hampir tidak pernah terpicu)
+  - TP: 10 / 20 / 30 pips; SL dari entry vs dari ujung zona
+  - Spread per bar asli + opsi `--spread-pips`
+  - [ ] partial 50% @10 + BE + sisa @30 (belum)
+- [x] Cocokkan simulasi dengan label laporan → hanya ~64% cocok (TP provider tidak tetap)
+- [x] Laporan: [BACKTEST_2026-11.md](BACKTEST_2026-11.md)
 - [ ] Dashboard: halaman hasil backtest
 
 **Selesai bila:** ada variasi yang profit setelah spread, dan keputusan terbuka #1–#5 bisa diputuskan.
+⚠️ **Belum terpenuhi** — semua variasi negatif di data Agu–Nov 2026, bahkan tanpa spread.
+Tahap 3 ditahan sampai ada keputusan arah (lihat BACKTEST_2026-11.md).
 
 ### Tahap 3 — Live, mode LOG (paper trade)
 - [ ] `tg_client.py` listen real-time
