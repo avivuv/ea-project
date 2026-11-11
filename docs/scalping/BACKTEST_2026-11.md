@@ -165,3 +165,26 @@ Kesimpulan: versi mekanis CHoCH + FVG ≈ **impas, belum ada edge**. Penilaian a
 likuiditas, bias TF besar, kualitas impuls) kemungkinan yang membuat setup manualnya bagus.
 Langkah lanjut yang masuk akal: kumpulkan contoh setup asli admin (dari topik lain di grup) untuk
 mengkalibrasi definisi, lalu uji tambahan syarat sweep likuiditas & bias H1 — dengan risiko overfitting.
+
+## Verifikasi sistem "TG Signal Layer" (folder `backend/CT Tele`, milik user) — 11 Nov 2026
+Sistem itu: entry pending di ZERO (market bila harga sudah di zona), SL = LAST ± 30 pips,
+**kunci SL +5 saat profit +10**, trailing (Akun1: TP30, trail mulai +15 step 5; Akun2: TP100, trail mulai +40 step 20).
+Panduannya: backtest 12 Okt – 10 Nov 2026, spread 0,8 pips → Akun1 +$19, Akun2 +$132 (skenario terburuk).
+Kode verifikasi: `tg_signal/managed_backtest.py` (M1, per sinyal independen, 0,01 lot).
+
+**Jebakan simulasi**: versi pertama kami memicu kunci +10 dari high bar fill yang bisa terjadi SEBELUM
+limit terisi → Akun1 tampak +$1.374 (Agu–Nov). Setelah diperbaiki (bar fill tidak memicu kunci; gap
+melewati SL keluar di open) → **−$615**. Aturan kunci sangat sensitif terhadap urutan harga di dalam candle.
+
+| Periode / spread | Akun1 TP30 kunci+trail | Akun2 TP100 trail40 | TP30 tanpa kunci | TP100 tanpa kunci |
+|---|---|---|---|---|
+| 12 Okt–10 Nov, spread 0,8 (= panduan) | +$22 | **+$126** | −$13 | −$157 |
+| 12 Okt–10 Nov, spread asli 1,7 | −$15 | +$91 | −$87 | −$216 |
+| Agu–Nov (2.274 trade), spread asli: paruh 1 / paruh 2 | −$503 / −$112 | −$406 / **+$73** | −$483 / −$315 | −$807 / −$651 |
+| Agu–Nov total, spread asli | −$615 | **−$333** | −$798 | −$1.459 |
+
+- Angka panduan **tereplikasi** di periodenya (Akun2 +$126 vs +$132) — tapi periode itu memang periode terbaik.
+- Di 3,5 bulan dengan spread asli, semua varian negatif; **aturan kunci + trailing konsisten memperbaiki**
+  dibanding SL/TP tetap (Akun2 vs TP100 tanpa kunci: −$406 vs −$807 dan +$73 vs −$651).
+- Spread sangat menentukan: 0,8 vs 1,7 pips ≈ selisih $35–40 per 660 trade.
+- Entry di pesan "Buy/Sell Now": diuji di panduan → lebih buruk (harga entry lebih jelek).
