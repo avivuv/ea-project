@@ -89,3 +89,26 @@ Info dari user: admin mengirim sinyal setelah ia sendiri entry. Hari 11 Nov 2026
   tren EMA20/50 M5, RSI, ATR, warna candle terakhir, jam): **tidak ada yang positif konsisten tiap bulan.**
   Jam 10, 13, 14 WIB terlihat positif secara total tapi negatif di salah satu bulan → kemungkinan kebetulan.
 - Catatan: entry admin terjadi *sebelum* pesan dikirim, di harga yang lebih baik dari yang bisa kita dapat.
+
+## Studi pola (`pattern_study.py`) — 11 Nov 2026
+Entry market langsung, SL 30 dari entry, TP 10/15/20/30. Latih: Agu–Sep 2026 (1.484 sinyal),
+uji: 1 Okt – 11 Nov 2026 (973 sinyal), harga M1. Fitur hanya dari informasi saat pesan diterima
+(25 fitur: jarak ke zona, return 1/5/15/60 menit, ATR M1/M5, posisi dalam range 60 menit & harian,
+EMA M5/H1, RSI M1/M5, candle terakhir, jam, hari, admin, jarak dari sinyal sebelumnya, urutan sinyal,
+hasil sinyal sebelumnya yang sudah diketahui, ada/tidaknya aba-aba "NOW").
+
+| Target | Model | AUC uji (0,5 = acak) |
+|---|---|---|
+| TP20 tercapai sebelum SL30 | logistic / gradient boosting | 0,488 / 0,478 |
+| Label laporan admin = LAST | logistic / gradient boosting | 0,536 / 0,507 |
+
+- Tidak ada fitur yang hubungannya konsisten di latih & uji untuk hasil TP/SL.
+- Satu-satunya fitur konsisten (lemah) untuk label LAST: **`dist_to_zero`** — makin jauh harga
+  dari tepi zona saat sinyal masuk (belum masuk zona), makin kecil peluang sampai LAST
+  (korelasi −0,095 latih / −0,067 uji). Terlalu lemah untuk filter; dicatat sebagai hipotesis uji maju.
+- Filter dari model tidak memperbaiki hasil secara konsisten (logistic TP20 −0,69 → +0,19 pips,
+  gradient boosting −0,69 → −0,99) → kemungkinan kebetulan.
+- Basis periode uji (Okt–Nov) lebih baik dari latih: TP10 −0,81, TP30 −0,96 pips/trade (vs −2,9 / −2,1).
+
+Kesimpulan: dengan data harga + konteks sinyal, **belum ada pola yang bisa memilih sinyal TP**.
+Langkah lanjut: kumpulkan data demo live, uji maju hipotesis `dist_to_zero` tanpa mengubah EA.
