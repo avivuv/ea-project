@@ -40,3 +40,23 @@ Reproduksi: `python -m tg_signal.backtest_tg` (opsi `--spread-pips`, `--validate
 - Asumsi konservatif: SL & TP di bar yang sama dihitung SL; bar fill limit hanya cek SL.
 - Sinyal disimulasikan independen (tanpa batas posisi bersamaan).
 - Definisi FVG/OB sederhana (pola 3 candle); konfirmasi "diskresi" admin tidak bisa ditiru.
+
+## Tambahan: periode Okt 2025 – Jul 2026 (bar M5)
+Server Exness hanya menyediakan ~100 ribu bar M1 terakhir (mulai 31 Jul 2026), walau
+"Max bars in chart" = Unlimited. M5 tersedia sejak 1 Okt 2025, jadi periode lama diuji di M5.
+
+M5 jauh lebih pesimis daripada M1 (dalam satu bar M5, urutan sentuh SL/TP tidak diketahui dan
+dihitung SL), jadi **angka absolutnya tidak dipakai**. Yang dipakai adalah perbandingan periode
+dengan bar yang sama:
+
+| Variasi (bar M5) | Agu–Nov 2026 (kalibrasi) | Okt 2025 – Jul 2026 |
+|---|---|---|
+| Limit ZERO / TP10 / SL zona | −10,17 pips/trade | −10,20 |
+| Limit ZERO / TP30 / SL zona | −5,73 | −5,37 |
+| Limit MID / TP30 / SL zona | −4,87 | −4,73 |
+| Limit LAST / TP30 / SL zona | −4,35 | −4,68 |
+
+Periode lama (7.093 sinyal, ~36/hari) berperilaku hampir sama persis dengan periode yang diuji di M1.
+Kesimpulan negatif dari data M1 kemungkinan besar berlaku untuk seluruh 13 bulan.
+Reproduksi: `python -m tg_signal.market_data --fetch --tf M5` lalu
+`python -m tg_signal.backtest_tg --bars M5 --start 2025-10-01 --end 2026-08-01`.

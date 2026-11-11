@@ -403,14 +403,23 @@ def main() -> None:
     ap.add_argument("--m5", action="store_true", help="ikutkan konfirmasi M5")
     ap.add_argument("--spread-pips", type=float, default=None,
                     help="ganti spread per bar dengan nilai tetap (pips), mis. 0 untuk edge kotor")
+    ap.add_argument("--bars", default="M1", choices=("M1", "M5"),
+                    help="timeframe bar simulasi; M5 kurang presisi, hanya variasi limit/layer")
+    ap.add_argument("--start", default=None, help="batasi rentang sinyal, YYYY-MM-DD")
+    ap.add_argument("--end", default=None)
     args = ap.parse_args()
 
-    df = load_m1()
+    df = load_m1(args.bars)
     start = df.index[0].to_pydatetime()
     end = df.index[-1].to_pydatetime()
+    if args.start:
+        start = max(start, datetime.fromisoformat(args.start).replace(tzinfo=timezone.utc))
+    if args.end:
+        end = min(end, datetime.fromisoformat(args.end).replace(tzinfo=timezone.utc))
+    df = df[(df.index >= start - timedelta(hours=1)) & (df.index <= end + timedelta(days=2))]
     store = Store(settings.DB_PATH)
     signals = load_signals(store, start, end)
-    print(f"Data M1: {start:%Y-%m-%d} → {end:%Y-%m-%d} | sinyal unik di rentang ini: {len(signals)}")
+    print(f"Data {args.bars}: {start:%Y-%m-%d} → {end:%Y-%m-%d} | sinyal unik di rentang ini: {len(signals)}")
 
     if args.check_offset:
         check_offset(signals, df)
@@ -425,14 +434,18 @@ def main() -> None:
             validate(store, signals, bars, tz)
         return
 
-    results = [simulate(sg, v, bars) for v in default_variants(args.m5) for sg in signals]
+    variants = default_variants(args.m5)
+    if args.bars == "M5":   # pola konfirmasi "M1" tidak bermakna di bar M5
+        variants = [v for v in variants if v.entry in ("ZERO", "MID", "LAST", "LAYER")]
+    results = [simulate(sg, v, bars) for v in variants for sg in signals]
     trades = pd.DataFrame(results)
-    trades.to_csv(settings.DATA_DIR / "backtest_trades.csv", index=False)
+    suffix = "" if args.bars == "M1" else f"_{args.bars.lower()}"
+    trades.to_csv(settings.DATA_DIR / f"backtest_trades{suffix}.csv", index=False)
     summary = summarize(trades)
-    summary.to_csv(settings.DATA_DIR / "backtest_summary.csv", index=False)
+    summary.to_csv(settings.DATA_DIR / f"backtest_summary{suffix}.csv", index=False)
     with pd.option_context("display.max_rows", 100, "display.width", 200):
         print(summary.to_string(index=False))
-    print(f"\nDisimpan: {settings.DATA_DIR / 'backtest_summary.csv'} dan backtest_trades.csv")
+    print(f"\nDisimpan di {settings.DATA_DIR}: backtest_summary{suffix}.csv, backtest_trades{suffix}.csv")
 
 
 if __name__ == "__main__":

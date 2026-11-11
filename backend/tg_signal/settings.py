@@ -49,6 +49,10 @@ USD_PER_PIP_001 = 0.10                          # 0.01 lot × 100 oz × $0.10
 MT5_UTC_OFFSET_H = _f("MT5_UTC_OFFSET_H", 0)
 M1_CACHE_PATH = DATA_DIR / f"m1_{SYMBOL}.csv.gz"
 
+
+def bars_cache_path(tf: str = "M1") -> Path:
+    return DATA_DIR / f"{tf.lower()}_{SYMBOL}.csv.gz"
+
 # ── Mode ────────────────────────────────────────────────────────────────────
 TG_MODE = os.getenv("TG_MODE", "LOG").upper()   # LOG | DEMO | LIVE
 TG_LIVE_CONFIRM = os.getenv("TG_LIVE_CONFIRM", "") == "YES"
