@@ -203,3 +203,17 @@ Avg pips/trade (trade):
 Kesimpulan: versi mekanis resep konfirmasi admin **tidak membuat sinyal menguntungkan**; rejection 61,8%
 hanya sedikit lebih baik dari entry langsung. Yang sejauh ini paling memperbaiki hasil adalah
 pengelolaan posisi (kunci +10 → +5 + trailing), bukan konfirmasi entry.
+
+## Aturan kunci untuk EA kita (entry market langsung) — `managed_backtest.py --ea`
+| Variasi (Agu–Nov, spread asli) | WR | Pips/trade | Paruh 1 | Paruh 2 | Total |
+|---|---|---|---|---|---|
+| EA sekarang: market, TP30/SL30 | 47% | −1,69 | −$285 | −$129 | −$414 |
+| market + kunci +10→+5 | 59% | −2,01 | −$421 | −$72 | −$493 |
+| market + Akun1 (TP30, trail) | 59% | −2,13 | −$399 | −$124 | −$523 |
+| market + Akun2 (TP100, trail 40) | 59% | −1,81 | −$399 | −$46 | −$444 |
+| market + SL zona + Akun2 | 71% | −2,12 | −$425 | −$97 | −$521 |
+| pending ZERO + SL zona + Akun2 (CT Tele) | 70% | −1,47 | −$406 | +$73 | −$334 |
+
+Dengan entry market langsung, kunci **memperburuk** hasil (memotong trade yang bisa TP30).
+Kunci hanya membantu bila satu paket dengan entry pending ZERO + SL di ujung zona.
+Keputusan: EA dibiarkan seperti sekarang; paket CT Tele disimulasikan saat analisa demo.

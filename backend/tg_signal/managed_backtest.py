@@ -39,7 +39,17 @@ class Mgmt:
     sl: float = 30
     pending_min: int = 60
     zone_tol: float = 5
+    entry: str = "zone"       # zone: pending ZERO / market bila di zona | market: entry langsung saat sinyal
 
+
+EA_VARIANTS = [
+    Mgmt("EA sekarang: market, TP30/SL30, tanpa kunci", 30, 0, 0, 0, 0, 0, sl_from_zone=False, entry="market"),
+    Mgmt("market, SL30, kunci+10→+5, TP30", 30, 10, 5, 0, 0, 0, sl_from_zone=False, entry="market"),
+    Mgmt("market, SL30, Akun1 (TP30, trail 15/10/5)", 30, 10, 5, 15, 10, 5, sl_from_zone=False, entry="market"),
+    Mgmt("market, SL30, Akun2 (TP100, trail 40/20/20)", 100, 10, 5, 40, 20, 20, sl_from_zone=False, entry="market"),
+    Mgmt("market, SL zona, Akun2", 100, 10, 5, 40, 20, 20, sl_from_zone=True, entry="market"),
+    Mgmt("pending ZERO, SL zona, Akun2 (CT Tele)", 100, 10, 5, 40, 20, 20, sl_from_zone=True, entry="zone"),
+]
 
 VARIANTS = [
     Mgmt("Akun1 TP30 kunci+trail", 30, 10, 5, 15, 10, 5),
@@ -74,10 +84,10 @@ def simulate(sig: bt.Signal, m: Mgmt, b: bt.Bars) -> dict:
     tol = m.zone_tol * PIP
     # posisi harga saat sinyal (ruang BUY): ask saat ini
     ask0 = o[0] + (spr[0] if is_buy else 0.0)
-    if ask0 < last - tol:
+    if m.entry != "market" and ask0 < last - tol:
         return {"outcome": "SKIP_BEYOND_LAST"}
     entry_i, entry = None, 0.0
-    if ask0 <= zero:                          # sudah di dalam zona → market
+    if m.entry == "market" or ask0 <= zero:   # entry langsung / sudah di dalam zona → market
         entry_i, entry = 0, ask0
     else:                                     # pending limit di ZERO
         for j in range(min(len(o), m.pending_min)):
@@ -87,10 +97,9 @@ def simulate(sig: bt.Signal, m: Mgmt, b: bt.Bars) -> dict:
                 break
         if entry_i is None:
             return {"outcome": "PENDING_EXPIRED"}
-    sl = (last if m.sl_from_zone else entry) - m.sl * PIP
-    sl = min(sl, entry - m.sl * PIP) if not m.sl_from_zone else sl
+    sl = (min(last, entry) if m.sl_from_zone else entry) - m.sl * PIP
     tp = entry + m.tp * PIP
-    limit_fill = not (entry_i == 0 and ask0 <= zero)
+    limit_fill = not (entry_i == 0 and (m.entry == "market" or ask0 <= zero))
     for j in range(entry_i, len(o)):
         xa = 0.0 if is_buy else spr[j]       # SELL keluar di ask
         lo, hi, op = l[j] - xa, h[j] - xa, o[j] - xa
@@ -111,6 +120,7 @@ def simulate(sig: bt.Signal, m: Mgmt, b: bt.Bars) -> dict:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--spread-pips", type=float, default=None)
+    ap.add_argument("--ea", action="store_true", help="bandingkan varian untuk EA kita (entry market)")
     a = ap.parse_args()
     df = bt.load_m1("M1")
     if a.spread_pips is not None:
@@ -123,7 +133,7 @@ def main() -> None:
     print(f"Spread: {'asli per bar (median %.1f pips)' % (df.spread.median() / PIP) if a.spread_pips is None else a.spread_pips}"
           f" | sinyal {len(sigs)} | Agu–Nov 2026 | USD @0.01 lot per sinyal")
     rows = []
-    for m in VARIANTS:
+    for m in (EA_VARIANTS if a.ea else VARIANTS):
         res = pd.DataFrame([{"time": pd.Timestamp(sg.time), **simulate(sg, m, b)} for sg in sigs])
         f = res.dropna(subset=["pips"])
         h1, h2 = f[f.time < split], f[f.time >= split]
