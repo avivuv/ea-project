@@ -26,9 +26,32 @@ from config import (
     FVG_SL_BUFFER_ATR, FVG_SL_BUFFER_ATR_BY_PAIR, FVG_RR, FVG_MAX_AGE_BARS,
     FVG_HTF_TREND_FILTER, FVG_HTF_EMA_FAST, FVG_HTF_EMA_SLOW,
     FVG_CONFIRM_BOUNCE, FVG_MAX_CHASE_ATR,
+    FVG_FIBO_FILTER, FVG_FIBO_LOOKBACK, FVG_FIBO_LEVELS, FVG_FIBO_TOL_ATR,
+    FVG_FIBO_DISABLED_PAIRS,
 )
 
 log = logging.getLogger(__name__)
+
+
+def _swing_fibo_levels(df: pd.DataFrame, direction: str, lookback: int) -> list[float]:
+    """Level Fibonacci retracement dari swing high/low N bar terakhir."""
+    recent = df.iloc[-lookback:]
+    swing_high = recent["high"].max()
+    swing_low  = recent["low"].min()
+    rng = swing_high - swing_low
+    if rng <= 0:
+        return []
+    if direction == "BUY":
+        # Retracement dari high ke low
+        return [swing_high - f * rng for f in FVG_FIBO_LEVELS]
+    else:
+        # Retracement dari low ke high
+        return [swing_low + f * rng for f in FVG_FIBO_LEVELS]
+
+
+def _fvg_at_fibo(bottom: float, top: float, levels: list[float], tol: float) -> bool:
+    """True jika ada level fibo yang jatuh dalam zona FVG ± toleransi ATR."""
+    return any(bottom - tol <= lvl <= top + tol for lvl in levels)
 
 
 class StrategyFVG(BaseStrategy):
@@ -97,6 +120,22 @@ class StrategyFVG(BaseStrategy):
                 self.strategy_id, "HOLD",
                 reason=f"fvg_too_old:{fvg.bars_ago}bars>max{FVG_MAX_AGE_BARS}",
             )
+
+        # ── Fibonacci confluence filter ───────────────────────────────────────
+        # Hanya entry di FVG yang juga bertepatan dengan level fibo dari swing terakhir
+        if FVG_FIBO_FILTER and pair.upper() not in FVG_FIBO_DISABLED_PAIRS:
+            tol    = FVG_FIBO_TOL_ATR * atr
+            levels = _swing_fibo_levels(df, fvg.direction, FVG_FIBO_LOOKBACK)
+            if not _fvg_at_fibo(fvg.bottom, fvg.top, levels, tol):
+                nearest = min(levels, key=lambda x: min(abs(x - fvg.bottom), abs(x - fvg.top))) if levels else 0
+                log.info(
+                    f"[{pair}] FVG no_fibo | zone=[{fvg.bottom:.5f}~{fvg.top:.5f}] "
+                    f"| nearest_fibo={nearest:.5f} | tol={tol:.5f}"
+                )
+                return StrategySignal(
+                    self.strategy_id, "HOLD",
+                    reason=f"fvg_not_at_fibo|nearest:{nearest:.5f}",
+                )
 
         # ── Bounce confirmation: tunggu candle reject zona FVG ───────────────
         # Cek apakah candle sebelumnya masuk zona dan candle terkini close keluar

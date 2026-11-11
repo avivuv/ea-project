@@ -113,8 +113,8 @@ async def analyze(req: AnalyzeRequest):
 
     log.info(f"[{pair}] analyze request | equity={req.equity} | pip_value={req.pip_value}")
 
-    # GATE 1: Session filter
-    if not is_session_allowed():
+    # GATE 1: Session filter (pair-aware: USDJPY → Tokyo, lainnya → London+NY)
+    if not is_session_allowed(pair):
         log.info(f"[{pair}] HOLD — outside trading session")
         return AnalyzeResponse(action="HOLD", reason="outside_session")
 

@@ -20,7 +20,11 @@ PAIR_RSI_CONFIG = {
     "USTEC":  {"buy_min": 42, "buy_max": 72, "sell_min": 28, "sell_max": 58},
     "DEFAULT": {"buy_min": 45, "buy_max": 70, "sell_min": 30, "sell_max": 55},
 }
-TIMEFRAME = os.getenv("TIMEFRAME", "H4")
+TIMEFRAME = os.getenv("TIMEFRAME", "M5")
+
+# Strategy on/off toggles (untuk isolasi backtest per strategi)
+EMA_TREND_ENABLED = os.getenv("EMA_TREND_ENABLED", "true").lower() == "true"
+FVG_ENABLED       = os.getenv("FVG_ENABLED",       "true").lower() == "true"
 
 # Indikator
 EMA_FAST = 50
@@ -143,6 +147,21 @@ ALLOWED_SESSIONS = [
 BLOCKED_MINUTES_BEFORE_NEWS = 30
 BLOCKED_MINUTES_AFTER_NEWS = 30
 
+# Session windows per pair (GMT hours, list of (start_inclusive, end_exclusive))
+# Dipakai oleh backtest --session-filter dan live trading session check
+SESSION_WINDOWS: dict[str, list[tuple[int, int]]] = {
+    "EURUSD":  [(8, 12), (13, 18)],   # London + NY
+    "GBPUSD":  [(8, 12), (13, 18)],   # London + NY
+    "XAUUSD":  [(8, 12), (13, 18)],   # London + NY (gold paling aktif)
+    "USDJPY":  [(0, 24)],             # 24 jam
+    "USOIL":   [(0, 24)],             # 24 jam
+    "US500":   [(0, 24)],             # 24 jam
+    "USTEC":   [(0, 24)],             # 24 jam
+    "AUDUSD":  [(0,  9)],             # Tokyo/Sydney
+    "BTCUSD":  [(8, 12), (13, 18)],   # London + NY overlap
+    "DEFAULT": [(8, 12), (13, 18)],   # fallback London + NY
+}
+
 # Minimum SL distance per pair (satuan harga) — hindari SL terlalu ketat
 # EURUSD: 10 pip = 0.0010 | USDJPY: 10 pip = 0.10 | XAUUSD: $2 | US500: 5 pts
 MIN_SL_DISTANCE = {
@@ -152,7 +171,7 @@ MIN_SL_DISTANCE = {
     "XAUUSD": float(os.getenv("MIN_SL_XAUUSD", "2.0")),
     "XAGUSD": float(os.getenv("MIN_SL_XAGUSD", "0.05")),  # 50 pip silver
     "USOIL":  float(os.getenv("MIN_SL_USOIL",  "0.10")),  # 0.10 price unit oil (~$100/lot)
-    "US500":  float(os.getenv("MIN_SL_US500",  "30.0")),
+    "US500":  float(os.getenv("MIN_SL_US500",  "15.0")),
     "USTEC":  float(os.getenv("MIN_SL_USTEC",  "150.0")),
     "EURCHF": float(os.getenv("MIN_SL_EURCHF", "0.0010")),
     "BTCUSD": float(os.getenv("MIN_SL_BTCUSD", "50.0")),
@@ -220,12 +239,20 @@ FVG_MIN_GAP_ATR     = float(os.getenv("FVG_MIN_GAP_ATR", "0.3"))   # gap minimum
 FVG_PROXIMITY_ATR   = float(os.getenv("FVG_PROXIMITY_ATR", "2.0")) # price harus dalam N × ATR dari FVG
 FVG_SL_BUFFER_ATR   = float(os.getenv("FVG_SL_BUFFER_ATR", "0.6"))
 FVG_SL_BUFFER_ATR_BY_PAIR: dict[str, float] = {
-    "US500": 2.0, "USTEC": 2.0,
+    "US500": 2.0, "USTEC": 2.0, "USOIL": 1.5,
 }
 FVG_RR              = float(os.getenv("FVG_RR", "2.0"))
 FVG_MAX_AGE_BARS    = int(os.getenv("FVG_MAX_AGE_BARS", "30"))      # zone lebih tua dari ini diabaikan
 FVG_CONFIRM_BOUNCE  = os.getenv("FVG_CONFIRM_BOUNCE", "true").lower() == "true"  # tunggu candle reject zona
 FVG_MAX_CHASE_ATR   = float(os.getenv("FVG_MAX_CHASE_ATR", "0.5"))  # max jarak entry dari zona setelah bounce (× ATR); lebih jauh → fallback LIMIT
+
+# Fibonacci confluence filter — hanya ambil FVG yang bertepatan dengan level fibo
+FVG_FIBO_FILTER   = os.getenv("FVG_FIBO_FILTER",   "true").lower() == "true"
+FVG_FIBO_LOOKBACK = int(os.getenv("FVG_FIBO_LOOKBACK", "30"))    # bars untuk swing high/low
+FVG_FIBO_LEVELS   = [0.382, 0.5, 0.618, 0.786]                   # level retracement yang dicek
+FVG_FIBO_TOL_ATR  = float(os.getenv("FVG_FIBO_TOL_ATR", "0.3"))  # toleransi ± N × ATR
+# Pair yang fibo filter-nya dimatikan (backtest menunjukkan fibo merugikan pair ini)
+FVG_FIBO_DISABLED_PAIRS = [p.strip().upper() for p in os.getenv("FVG_FIBO_DISABLED_PAIRS", "USDJPY").split(",") if p.strip()]
 
 # Per-pair FVG minimum gap override (pair lebih choppy butuh threshold lebih tinggi)
 FVG_MIN_GAP_ATR_PAIRS: dict[str, float] = {}
@@ -370,6 +397,23 @@ BPR_MAX_AGE_BARS       = int(os.getenv("BPR_MAX_AGE_BARS", "60"))     # BPR lebi
 BPR_MAX_TEMPORAL_GAP   = int(os.getenv("BPR_MAX_TEMPORAL_GAP", "24"))  # jarak max bars antar dua FVG (ICT V-shape ~6 jam M15)
 BPR_MAX_CHASE_ATR      = float(os.getenv("BPR_MAX_CHASE_ATR", "0.5")) # max jarak entry dari zona setelah bounce
 BPR_HTF_TREND_FILTER   = os.getenv("BPR_HTF_TREND_FILTER", "true").lower() == "true"
+
+# ── 3 EMA + Fibonacci Strategy ────────────────────────────────────────────────
+# EMA stack (50/100/150) konfirmasi trend + LIMIT di fibo+EMA confluence zone
+EMA3_FIBO_ENABLED        = os.getenv("EMA3_FIBO_ENABLED", "false").lower() == "true"
+EMA3_FIBO_FAST           = int(os.getenv("EMA3_FIBO_FAST",  "50"))
+EMA3_FIBO_MID            = int(os.getenv("EMA3_FIBO_MID",   "100"))
+EMA3_FIBO_SLOW           = int(os.getenv("EMA3_FIBO_SLOW",  "150"))
+EMA3_FIBO_SWING_LOOKBACK = int(os.getenv("EMA3_FIBO_SWING_LOOKBACK", "30"))   # bars untuk swing detection
+EMA3_FIBO_LEVELS         = [0.5, 0.618]                                        # fibo retracement dicek (OTE zone)
+EMA3_FIBO_EMA_TOL_ATR    = float(os.getenv("EMA3_FIBO_EMA_TOL_ATR",    "0.5"))  # toleransi fibo-EMA confluence
+EMA3_FIBO_PROXIMITY_ATR  = float(os.getenv("EMA3_FIBO_PROXIMITY_ATR",  "3.0"))  # max jarak price ke entry
+EMA3_FIBO_SL_BUFFER_ATR  = float(os.getenv("EMA3_FIBO_SL_BUFFER_ATR",  "0.5"))  # buffer SL di luar EMA150
+EMA3_FIBO_RR             = float(os.getenv("EMA3_FIBO_RR", "2.0"))
+EMA3_FIBO_ADX_MIN        = int(os.getenv("EMA3_FIBO_ADX_MIN", "20"))            # ADX minimum — filter sideways
+EMA3_FIBO_CONFIRM_CANDLE = os.getenv("EMA3_FIBO_CONFIRM_CANDLE", "true").lower() == "true"  # wajib rejection candle di zona
+EMA3_FIBO_TOUCH_TOL_ATR  = float(os.getenv("EMA3_FIBO_TOUCH_TOL_ATR", "0.3"))  # toleransi "menyentuh" zona
+EMA3_FIBO_MIN_SPREAD_ATR = float(os.getenv("EMA3_FIBO_MIN_SPREAD_ATR", "3.0"))  # min spread EMA50-EMA150 (× ATR) — trend harus cukup kuat
 BPR_HTF_EMA_FAST       = int(os.getenv("BPR_HTF_EMA_FAST", "20"))    # H4 EMA cepat
 BPR_HTF_EMA_SLOW       = int(os.getenv("BPR_HTF_EMA_SLOW", "50"))    # H4 EMA lambat
 BPR_DISABLED_PAIRS     = [p.strip().upper() for p in os.getenv("BPR_DISABLED_PAIRS", "").split(",") if p.strip()]

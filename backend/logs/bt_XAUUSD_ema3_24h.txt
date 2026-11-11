@@ -1,0 +1,56 @@
+﻿pip_value estimasi: 1.0 (override dengan --pipval)
+
+Backtest: XAUUSD | tf=M15 | step=4 | trail=OFF | session=24h
+CSV: C:\laragon\www\ea-project\backend\..\data\XAUUSD_GMT+0_NO-DST_M15.csv
+  132,634 candle M15 | 2020-01-01 23:00:00 s/d 2025-08-11 23:45:00
+Estimasi 33,096 iterasi sinyal. Ini mungkin butuh beberapa menit...
+
+Resampling ke H4 dan D1... H4=8,974 bars | D1=1,743 bars
+   12.8% | bar=17,154/132,634 | trades=10 | equity=$10,228.67 | ETA=9.4min
+   13.7% | bar=18,418/132,634 | trades=10 | equity=$10,228.67 | ETA=9.3min
+   35.2% | bar=46,834/132,634 | trades=20 | equity=$10,121.33 | ETA=7.0min
+   53.5% | bar=71,014/132,634 | trades=30 | equity=$9,726.52 | ETA=4.9min
+   69.7% | bar=92,554/132,634 | trades=40 | equity=$10,203.89 | ETA=3.1min
+   83.5% | bar=110,770/132,634 | trades=50 | equity=$9,497.80 | ETA=1.7min
+   83.5% | bar=110,774/132,634 | trades=50 | equity=$9,497.80 | ETA=1.7min
+   97.1% | bar=128,730/132,634 | trades=60 | equity=$9,934.92 | ETA=0.3min
+
+  Selesai dalam 10.0 menit | 63 trades
+
+==============================================================
+  BACKTEST REPORT  XAUUSD  (5 tahun, no circuit breaker)
+==============================================================
+  Initial equity    : $10,000.00
+  Final equity      : $9,945.06
+  Total return      : -0.55%
+  Max drawdown      : 11.55%
+--------------------------------------------------------------
+  Total trades      : 63
+  Win / BE / Loss   : 21 / 0 / 42
+  Win rate          : 33.3%
+  Avg win           : +1.999%
+  Avg loss          : -0.998%
+  Profit factor     : 1.00
+  Order types       : {'LIMIT': 63}
+  Close reasons     : {'sl': 42, 'tp': 21}
+==============================================================
+
+  STRATEGI          #  WIN    WR%    PF    AvgW%   AvgL%  Verdict
+  --------------------------------------------------------------
+  EMA3_FIBO        63   21  33.3%  1.00   +2.00%  -1.00%  OK
+
+  Last 10 trades:
+  #    Strategy       Dir         Open      Close     PnL%  Reason
+  --------------------------------------------------------------
+  1    EMA3_FIBO      BUY     2662.640   2693.362  +1.942%  tp
+  2    EMA3_FIBO      SELL    2600.381   2616.939  -1.027%  sl
+  3    EMA3_FIBO      BUY     3113.385   3157.602  +1.847%  tp
+  4    EMA3_FIBO      BUY     3223.210   3323.590  +2.058%  tp
+  5    EMA3_FIBO      SELL    3308.560   3360.740  -1.048%  sl
+  6    EMA3_FIBO      SELL    3243.345   3151.293  +1.869%  tp
+  7    EMA3_FIBO      BUY     3306.667   3273.573  -0.989%  sl
+  8    EMA3_FIBO      BUY     3365.087   3344.941  -1.014%  sl
+  9    EMA3_FIBO      BUY     3424.862   3395.304  -0.902%  sl
+  10   EMA3_FIBO      SELL    3319.365   3286.108  +2.048%  tp
+
+  Trade log: C:\laragon\www\ea-project\backend\logs\backtest_XAUUSD.json

@@ -9,6 +9,7 @@ from config import (
     CORRELATED_PAIRS, CORRELATION_FILTER, ALLOWED_SESSIONS,
     MIN_LOT_SIZE, MAX_LOT_SIZE, MAX_LOT_BY_PAIR, SESSION_FILTER,
     MIN_PIP_VALUE, PIP_SIZE, MIN_SL_DISTANCE,
+    SESSION_WINDOWS,
 )
 
 STATE_FILE = os.path.join(os.path.dirname(__file__), "state", "risk_state.json")
@@ -175,11 +176,9 @@ def check_risk(
     )
 
 
-def is_session_allowed() -> bool:
+def is_session_allowed(pair: str = "") -> bool:
     if not SESSION_FILTER:
         return True
     now_hour = datetime.now(timezone.utc).hour
-    for session in ALLOWED_SESSIONS:
-        if session["start"] <= now_hour < session["end"]:
-            return True
-    return False
+    windows = SESSION_WINDOWS.get(pair.upper(), SESSION_WINDOWS["DEFAULT"])
+    return any(s <= now_hour < e for s, e in windows)

@@ -10,7 +10,8 @@ from strategies.strategy_bumi import StrategyBUMI
 from strategies.strategy_obfvg import StrategyOBFVG
 from strategies.strategy_ob_confirm import StrategyOBConfirm
 from strategies.strategy_bpr import StrategyBPR
-from config import MIN_SIGNAL_CONF, MIN_STRATEGIES_CONFIRM, SINGLE_HIGH_CONF, ATR_PERIOD, BUMI_ENABLED, OBFVG_ENABLED, OBFVG_DISABLED_PAIRS, OB_CONFIRM_ENABLED, OB_CONFIRM_DISABLED_PAIRS, BPR_ENABLED, BPR_DISABLED_PAIRS
+from strategies.strategy_3ema_fibo import Strategy3EmaFibo
+from config import MIN_SIGNAL_CONF, MIN_STRATEGIES_CONFIRM, SINGLE_HIGH_CONF, ATR_PERIOD, EMA_TREND_ENABLED, FVG_ENABLED, BUMI_ENABLED, OBFVG_ENABLED, OBFVG_DISABLED_PAIRS, OB_CONFIRM_ENABLED, OB_CONFIRM_DISABLED_PAIRS, BPR_ENABLED, BPR_DISABLED_PAIRS, EMA3_FIBO_ENABLED
 from sr_detector import find_sr_levels, near_sr_level
 
 SR_CONFLUENCE_BONUS     = 0.10   # bonus confidence jika entry dekat S/R level
@@ -19,12 +20,13 @@ SR_CONFLUENCE_TOLERANCE = 0.5    # dalam N × ATR dari S/R level
 log = logging.getLogger(__name__)
 
 _strategies = [
-    StrategyEMA(),                                      # EMA + ADX Spike + Stochastic
-    StrategyFVG(),                                      # Fair Value Gap
-    *([StrategyBUMI()]      if BUMI_ENABLED      else []),  # BUMI 4 MA Cross (opsional)
-    *([StrategyOBFVG()]     if OBFVG_ENABLED     else []),  # OB+FVG confluence (opsional)
-    *([StrategyOBConfirm()] if OB_CONFIRM_ENABLED else []), # OB fresh + candle confirmation
-    *([StrategyBPR()]       if BPR_ENABLED       else []), # Balanced Price Range (M15)
+    *([StrategyEMA()]       if EMA_TREND_ENABLED  else []),  # EMA + ADX Spike + Stochastic
+    *([StrategyFVG()]       if FVG_ENABLED        else []),  # Fair Value Gap
+    *([StrategyBUMI()]      if BUMI_ENABLED       else []),  # BUMI 4 MA Cross (opsional)
+    *([StrategyOBFVG()]     if OBFVG_ENABLED      else []),  # OB+FVG confluence (opsional)
+    *([StrategyOBConfirm()] if OB_CONFIRM_ENABLED else []),  # OB fresh + candle confirmation
+    *([StrategyBPR()]       if BPR_ENABLED        else []),  # Balanced Price Range (M15)
+    *([Strategy3EmaFibo()]  if EMA3_FIBO_ENABLED  else []),  # 3 EMA + Fibonacci confluence
 ]
 
 

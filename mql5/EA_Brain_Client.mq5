@@ -1,6 +1,6 @@
 //+------------------------------------------------------------------+
 //|  EA Brain Client — MQL5                                          |
-//|  Kirim OHLCV M15 + H1 + H4 ke Python backend                    |
+//|  Kirim OHLCV M5 + H1 + H4 ke Python backend                     |
 //|  Support: market order (Strategy 1) + pending order (Strategy 2) |
 //+------------------------------------------------------------------+
 #property strict
@@ -9,8 +9,8 @@ input string BackendURL           = "http://127.0.0.1:8000";
 input string TradePair            = "";    // kosong = otomatis pakai Symbol()
 input double PipValue             = 0;    // 0 = hitung otomatis
 input string NewsApiKey           = "";   // opsional
-input int    CandleCount          = 880;  // candle M15 (~9 hari)
-input int    PendingExpiryCandles = 4;    // cancel pending order setelah N candle M15
+input int    CandleCount          = 880;  // candle M5 (~3 hari)
+input int    PendingExpiryCandles = 4;    // cancel pending order setelah N candle M5
 input double ProfitTargetUSD      = 0;    // close semua posisi EA jika total floating >= nilai ini (0 = disabled)
 input double DailyProfitLimitUSD  = 0; // close all + stop trading jika profit harian (closed+floating) >= nilai ini (0 = disabled)
 
@@ -152,12 +152,12 @@ void OnTimer()
    }
 
    string pair = (TradePair == "") ? Symbol() : TradePair;
-   datetime currentCandleTime = iTime(Symbol(), PERIOD_M15, 0);
+   datetime currentCandleTime = iTime(Symbol(), PERIOD_M5, 0);
 
    if(currentCandleTime == lastCandleTime) return;
    lastCandleTime = currentCandleTime;
 
-   Print("New M15 candle — running analysis...");
+   Print("New M5 candle — running analysis...");
 
    // Safety valve: sync tradeOpen dengan kondisi aktual MT5
    if(tradeOpen && !HasOpenPosition(pair))
@@ -198,9 +198,9 @@ void RunAnalysis()
    double equity = AccountInfoDouble(ACCOUNT_EQUITY);
    double pipVal = (PipValue > 0) ? PipValue : GetPipValue(pair);
 
-   // Candle M15 (main TF — semua strategi)
-   string candlesJson = BuildCandlesJSON(pair, CandleCount, PERIOD_M15);
-   if(candlesJson == "") { Print("ERROR: failed to build M15 candles"); return; }
+   // Candle M5 (main TF — semua strategi)
+   string candlesJson = BuildCandlesJSON(pair, CandleCount, PERIOD_M5);
+   if(candlesJson == "") { Print("ERROR: failed to build M5 candles"); return; }
 
    // Candle H1 (HTF confirmation Strategy 1)
    string htfCandlesJson = BuildCandlesJSON(pair, 211, PERIOD_H1);

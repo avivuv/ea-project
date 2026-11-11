@@ -30,6 +30,7 @@ from config import (
     MIN_LOT_SIZE, MAX_LOT_BY_PAIR, MAX_LOT_SIZE,
     PIP_SIZE, MIN_PIP_VALUE, MIN_SL_DISTANCE,
     RISK_PER_TRADE_PCT, FIXED_RISK_USD,
+    SESSION_WINDOWS,
 )
 
 WARMUP_CANDLES  = 250    # minimum candle M15 untuk EMA200
@@ -171,7 +172,8 @@ def update_trailing(trade: Trade, high: float, low: float, idx: int) -> None:
 
 def run_backtest(df_m15: pd.DataFrame, pair: str, initial_equity: float,
                  pip_value: float, use_trail: bool, step: int,
-                 no_circuit_breaker: bool = False) -> tuple[list, list, float]:
+                 no_circuit_breaker: bool = False,
+                 session_filter: bool = False) -> tuple[list, list, float]:
 
     print("Resampling ke H4 dan D1...", end=" ", flush=True)
     df_h4 = resample_ohlcv(df_m15, "4h")
@@ -269,6 +271,13 @@ def run_backtest(df_m15: pd.DataFrame, pair: str, initial_equity: float,
             continue
         if (i - WARMUP_CANDLES) % step != 0:
             continue
+
+        # ── 4b. Session filter: gunakan window per pair dari SESSION_WINDOWS ────
+        if session_filter:
+            h = t_now.hour
+            windows = SESSION_WINDOWS.get(pair, SESSION_WINDOWS["DEFAULT"])
+            if not any(s <= h < e for s, e in windows):
+                continue
 
         # ── 5. Build HTF slices (binary search sederhana) ─────────────────────
         h4_idx = (h4_times <= t_now).sum()
@@ -471,6 +480,8 @@ def main():
                         help="Aktifkan trailing stop (default: OFF)")
     parser.add_argument("--no-circuit-breaker", action="store_true",
                         help="Nonaktifkan circuit breaker max drawdown (lihat performa penuh)")
+    parser.add_argument("--session-filter",     action="store_true",
+                        help="Hanya entry di jam London 08-12 GMT & NY 13-18 GMT (sama seperti live)")
     args = parser.parse_args()
 
     pair = args.pair.upper()
@@ -501,7 +512,12 @@ def main():
             print(f"CSV {tf} tidak ditemukan. Gunakan --csv <path>")
             sys.exit(1)
 
-    print(f"\nBacktest: {pair} | tf={tf} | step={step} | trail={'ON' if args.trail else 'OFF'}")
+    if args.session_filter:
+        windows = SESSION_WINDOWS.get(pair, SESSION_WINDOWS["DEFAULT"])
+        session_tag = "+".join(f"{s:02d}-{e:02d}GMT" for s, e in windows)
+    else:
+        session_tag = "24h"
+    print(f"\nBacktest: {pair} | tf={tf} | step={step} | trail={'ON' if args.trail else 'OFF'} | session={session_tag}")
     print(f"CSV: {csv_path}")
     df = load_csv(csv_path)
 
@@ -516,6 +532,7 @@ def main():
         df, pair, args.equity, pip_value,
         use_trail=args.trail, step=step,
         no_circuit_breaker=args.no_circuit_breaker,
+        session_filter=args.session_filter,
     )
     print_report(closed, args.equity, final_equity, equity_curve, pair)
 
