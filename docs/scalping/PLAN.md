@@ -157,3 +157,14 @@ Tahap 3 ditahan sampai ada keputusan arah (lihat BACKTEST_2026-11.md).
 - Rasio SL:TP 30:10 → butuh win rate > 75% hanya untuk impas. Klaim laporan (19/20) wajib diverifikasi.
 - Sinyal bisa ~20/hari dengan zona tumpang tindih → aturan duplikat & max posisi penting.
 - Latency Telegram → order 1–3 detik; spread XAUUSD saat news bisa melebar.
+
+## Catatan: kandidat aturan (belum dipakai di EA)
+Dicatat 11 Nov 2026 — **dievaluasi saat analisa hasil demo, tanpa mengubah EA** (uji maju).
+1. **Filter FVG M5** — entry hanya bila saat sinyal masuk sudah ada FVG M5 searah di zona
+   (SELL ↔ bearish, BUY ↔ bullish), lebih baik yang masih *open*, dan tidak ada FVG M1 berlawanan
+   yang masih terbuka di jalur harga → TP. Backtest: +1,5 / +1,4 pips/trade (TP30) di Agu–Sep / Okt–Nov
+   vs −2,1 / −1,0 untuk semua sinyal; efek searah di periode lama. Lihat BACKTEST_2026-11.md.
+   Kode: `fvg_context.py` (FVGIndex.context), `fvg_study.py`.
+2. **Jarak ke zona** (`dist_to_zero`) — harga yang belum masuk zona saat sinyal masuk lebih jarang
+   sampai LAST. Efek lemah.
+3. **TP lebih kecil (15–20)** — bandingkan dengan TP30 pada sinyal demo yang sama.
