@@ -168,3 +168,11 @@ Dicatat 11 Nov 2026 — **dievaluasi saat analisa hasil demo, tanpa mengubah EA*
 2. **Jarak ke zona** (`dist_to_zero`) — harga yang belum masuk zona saat sinyal masuk lebih jarang
    sampai LAST. Efek lemah.
 3. **TP lebih kecil (15–20)** — bandingkan dengan TP30 pada sinyal demo yang sama.
+4. **CHoCH + FVG (contoh user 11 Nov 2026, chart 3m)** — range 16:30–16:55 WIB (±4048.3–4051),
+   sweep ke ±4046.5, lalu ±16:58–17:05 impuls bullish tembus high range (CHoCH) meninggalkan FVG,
+   puncak ±4055.9, retest ±4048–4049 jam 17:10–17:20. Admin baru kirim **BUY 49-45 jam 17:22** tepat
+   di retest → EA entry 4048.97, TP 17:31 (+30 pips). Dua ide untuk diuji:
+   - **A. Filter**: ambil sinyal admin hanya bila didahului CHoCH searah + FVG (M3/M5).
+   - **B. Sinyal sendiri**: EA deteksi CHoCH + FVG sendiri, entry saat retest ke FVG, SL di bawah
+     swing low (contoh: entry 4049.16, SL 4046.53, TP 4054.60 ≈ 2R). Basis kode CHoCH:
+     `detectors/order_block.py` (`detect_choch`, perlu disesuaikan ke M3/M5).
