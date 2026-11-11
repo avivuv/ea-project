@@ -230,13 +230,13 @@ class S2:
         return f"S2_orb_{self.session}_{self.rng_min}m_{self.sl}_{self.tp}"
 
 
-def s2_orders(df: pd.DataFrame, p: S2) -> list[Order]:
+def s2_orders(df: pd.DataFrame, p: S2, tf_min: int = 5) -> list[Order]:
     oh, om, trig_h, force_h = SESSIONS[p.session]
     out = []
     for day, d in df.groupby(df.index.normalize()):
         o0 = day + pd.Timedelta(hours=oh, minutes=om)
         rng = d[(d.index >= o0) & (d.index < o0 + pd.Timedelta(minutes=p.rng_min))]
-        if len(rng) < p.rng_min // 5:
+        if len(rng) < max(1, p.rng_min // tf_min):
             continue
         hi, lo = rng["high"].max(), rng["low"].min()
         if not (1.5 <= hi - lo <= 15.0):
@@ -254,7 +254,7 @@ def s2_orders(df: pd.DataFrame, p: S2) -> list[Order]:
                 break
             mult = {"1.5R": 1.5, "2R": 2.0}.get(p.tp)
             tp = None if mult is None else (ref + mult * risk if buy else ref - mult * risk)
-            act = ts + pd.Timedelta(minutes=5)
+            act = ts + pd.Timedelta(minutes=tf_min)
             out.append(Order(buy, "market", ref, sl - (BUF if buy else -BUF), tp, act, act,
                              day + pd.Timedelta(hours=force_h)))
             break

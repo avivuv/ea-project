@@ -38,3 +38,35 @@ strategi berfrekuensi ±20 trade/bulan dengan hasil "ekor gemuk".
 1. Ambil data historis multi-tahun (mis. Dukascopy XAUUSD M1/M5 2019–2025) dan uji ulang
    ORB London 15m + S1 Sweep Asia dengan aturan yang sama persis (tanpa disetel ulang).
 2. Bila tetap positif dan stabil per tahun → uji demo dengan lot berbasis risiko 0,5–1%.
+
+## Uji multi-tahun (`multiyear.py`) — bar M15 Exness Sep 2022 – Nov 2026
+Datafeed Dukascopy (`datafeed.dukascopy.com`) timeout dari jaringan ini; pengunduh tetap tersedia di
+`intraday/dukascopy.py`. Exness MT5 menyediakan M15 sejak Sep 2022 (M30 sejak 2018, H1 sejak 2015),
+M5 hanya sejak Jun 2025. ORB diuji ulang di M15 dengan aturan sama (kalibrasi Jun 2025 – Nov 2026:
+M15 sedikit lebih pesimis dari M5, arah sama).
+
+| Variasi ORB (M15) | Trade | WR | avg R | 2022* | 2023 | 2024 | 2025 | 2026 | Tahun + |
+|---|---|---|---|---|---|---|---|---|---|
+| London 15m, SL tengah, tahan s/d sesi | 970 | 17% | +0,07 | +9,9 | −0,9 | −5,0 | −19,8 | +84,1 | 2/5 |
+| London 15m, SL seberang, tahan | 970 | 24% | +0,03 | −11,7 | −1,2 | −2,6 | −0,7 | +48,0 | 1/5 |
+| **NY 15m, SL seberang, TP 1,5R** | 864 | 47% | +0,06 | +5,8 | +18,0 | +4,8 | +19,9 | +2,5 | **5/5** |
+| NY 30m, SL seberang, TP 1,5R | 711 | 49% | +0,05 | −0,8 | +31,8 | +1,3 | +12,4 | −9,3 | 3/5 |
+*2022 = Sep–Des.
+
+- **ORB London (kandidat dari uji 13 bulan) ternyata hanya untung di 2026** — 2023–2025 rugi → kebetulan periode.
+- **ORB NY 15m SL seberang TP 1,5R positif di 5/5 tahun**, tapi edge kecil (+0,06R/trade, DD maks 19,7R)
+  dan merupakan 1 dari 24 variasi. NY buka 13:30 UTC = jam rilis data AS → slippage nyata bisa
+  menghapus edge sekecil ini. Kandidat untuk diuji dengan spread/slippage lebih besar, belum siap demo.
+
+## Catatan dari topik lain grup (dibaca 11 Nov 2026, isi grup tidak disalin ke repo)
+Aturan entry yang disebut admin secara eksplisit (topik Edukasi):
+- Area/zona sinyal scalping: perhatikan **OBIM** (Order Block + Imbalance) dan **Breaker Block**
+  di start / mid / last zone.
+- "**Candle terjepit**" (TF M15/M5/M3) sebagai area pantulan: candle searah di tengah, diapit
+  2 candle berlawanan sebelum dan 2 sesudah; area = high–low candle tengah.
+  Konfirmasi entry di **M1**: candle rejection (sumbu ≥ **61,8%** ukuran candle), engulfing, atau OBIM.
+- Sinyal scalping berasal dari indikator berbayar "POI" (konfirmasi: Apache, rejection, FVG/IFVG,
+  engulfing, RSI) — tidak tersedia untuk kita.
+- Sinyal ambigu: ikuti notifikasi pertama. "Tidak semua sinyal harus diikuti" (ada diskresi).
+Kandidat uji berikutnya: strategi **candle terjepit + konfirmasi M1 (rejection 61,8% / engulfing / OBIM)**,
+dan filter sinyal grup memakai rejection 61,8% (sebelumnya diuji dengan 50%).

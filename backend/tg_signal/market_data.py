@@ -25,7 +25,7 @@ def _month_ranges(start: datetime, end: datetime):
         cur = nxt
 
 
-TIMEFRAMES = ("M1", "M5")
+TIMEFRAMES = ("M1", "M5", "M15")
 
 
 def fetch_from_mt5(start: datetime, end: datetime, symbol: str = settings.SYMBOL,
