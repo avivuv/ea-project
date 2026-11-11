@@ -35,7 +35,7 @@ Reproduksi: `python -m tg_signal.backtest_tg` (opsi `--spread-pips`, `--validate
    +10 pips dari ZERO sebelum pola konfirmasi selesai. Konfirmasi M5 hampir tidak pernah terpicu.
 
 ## Keterbatasan
-- Hanya ~3,5 bulan data; histori Okt 2025 – Jul 2026 belum terunduh di terminal.
+- M1 hanya ~3,5 bulan (batas server Exness); periode Okt 2025 – Jul 2026 diuji di M5 (lihat bawah).
 - Spread/feed Exness bisa beda dengan broker yang dipakai provider.
 - Asumsi konservatif: SL & TP di bar yang sama dihitung SL; bar fill limit hanya cek SL.
 - Sinyal disimulasikan independen (tanpa batas posisi bersamaan).
@@ -60,3 +60,14 @@ Periode lama (7.093 sinyal, ~36/hari) berperilaku hampir sama persis dengan peri
 Kesimpulan negatif dari data M1 kemungkinan besar berlaku untuk seluruh 13 bulan.
 Reproduksi: `python -m tg_signal.market_data --fetch --tf M5` lalu
 `python -m tg_signal.backtest_tg --bars M5 --start 2025-10-01 --end 2026-08-01`.
+
+## Tambahan: konfirmasi 1 candle (rejection / pin bar) — M1, Agu–Nov 2026
+Candle searah sinyal dengan sumbu ≥ 50% range yang menyentuh zona (`REJ`).
+
+| Variasi | Trade/hari | WR | Avg pips | Avg pips tanpa spread |
+|---|---|---|---|---|
+| REJ / TP10 / SL entry (hangus +10) | 5,2 | 66,5% | −3,40 | −1,62 |
+| REJ / TP10 / SL zona (hangus +10) | 5,2 | 79,1% | −4,23 | −2,45 |
+| REJ / TP10 / SL entry (tanpa batas hangus) | 24,8 | 66,4% | −3,45 | — |
+
+Juga negatif, bahkan tanpa spread. Melonggarkan batas hangus hanya menambah jumlah trade rugi.

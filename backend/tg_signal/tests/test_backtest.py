@@ -78,3 +78,12 @@ def test_confirmation_ob_buy():
     l = [9.7, 9.2, 9.25]
     c = [9.8, 9.3, 9.95]     # bar1 bearish, bar2 bullish close 9.95 > high bar1 9.85
     assert confirmed("OB", "BUY", o, h, l, c, 2, zero=9.3)
+
+
+def test_confirmation_rejection_candle():
+    # BUY: low 9.0 di zona, close > open, sumbu bawah 0.6 dari range 0.8
+    assert confirmed("REJ", "BUY", [9.6], [9.8], [9.0], [9.7], 0, zero=9.1)
+    # candle bearish → bukan rejection BUY
+    assert not confirmed("REJ", "BUY", [9.7], [9.8], [9.0], [9.6], 0, zero=9.1)
+    # SELL mirror: high 10.0 di zona, close < open, sumbu atas 0.6
+    assert confirmed("REJ", "SELL", [9.4], [10.0], [9.2], [9.3], 0, zero=9.9)
