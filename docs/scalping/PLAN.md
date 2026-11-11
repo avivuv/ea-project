@@ -168,7 +168,7 @@ Dicatat 11 Nov 2026 — **dievaluasi saat analisa hasil demo, tanpa mengubah EA*
 2. **Jarak ke zona** (`dist_to_zero`) — harga yang belum masuk zona saat sinyal masuk lebih jarang
    sampai LAST. Efek lemah.
 3. **TP lebih kecil (15–20)** — bandingkan dengan TP30 pada sinyal demo yang sama.
-4. **CHoCH + FVG (setup milik user sendiri, DI LUAR sinyal grup; contoh 11 Nov 2026, chart 3m)** — range 16:30–16:55 WIB (±4048.3–4051),
+4. **CHoCH + FVG (pengamatan salah satu admin, tapi BUKAN dari topik Scalping; contoh 11 Nov 2026, chart 3m)** — range 16:30–16:55 WIB (±4048.3–4051),
    sweep ke ±4046.5, lalu ±16:58–17:05 impuls bullish tembus high range (CHoCH) meninggalkan FVG,
    puncak ±4055.9, retest ±4048–4049 jam 17:10–17:20. Admin baru kirim **BUY 49-45 jam 17:22** tepat
    di retest → EA entry 4048.97, TP 17:31 (+30 pips). Dua ide untuk diuji:
