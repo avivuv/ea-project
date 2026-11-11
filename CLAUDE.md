@@ -52,3 +52,14 @@ Trend-Following H4/D1, 4-gate validation:
 - Pairs: EURUSD, GBPUSD, USDJPY
 - SL: 1.5 × ATR | TP: 2.5 × ATR | Trailing: 1 × ATR
 - Max drawdown: 12% → EA pause otomatis
+
+## Modul Scalping Telegram (branch `scalping`)
+
+Program terpisah, full Python: baca sinyal scalping XAUUSD dari grup Telegram (Telethon),
+konfirmasi FVG/OB di M1/M5, eksekusi via library `MetaTrader5`, dashboard NiceGUI.
+
+- Kode: `backend/tg_signal/` (punya CLAUDE.md sendiri)
+- Plan & status: [docs/scalping/PLAN.md](docs/scalping/PLAN.md)
+- Format sinyal: [docs/scalping/SIGNAL_SPEC.md](docs/scalping/SIGNAL_SPEC.md)
+- Aturan trading/risk/keamanan: [docs/scalping/RULES.md](docs/scalping/RULES.md)
+- Default mode `LOG` (tanpa order). Jangan jalankan eksekusi di akun LIVE.

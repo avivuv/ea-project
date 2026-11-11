@@ -27,3 +27,8 @@ backend/state/
 # OS
 .DS_Store
 Thumbs.db
+
+# Telegram signal module (session & data pribadi)
+*.session
+*.session-journal
+backend/tg_signal/data/
