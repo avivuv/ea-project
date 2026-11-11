@@ -183,3 +183,11 @@ Dicatat 11 Nov 2026 — **dievaluasi saat analisa hasil demo, tanpa mengubah EA*
    di/di atas LAST (FVG/swing high) + buffer spread, bukan jarak tetap 30 pips. Catatan: versi kasar
    "SL = LAST ± 30 pips" sudah diuji dan lebih buruk (MARKET TP30: −2,51 vs −1,67 pips/trade) karena
    risiko ±70 pips; versi presisi di atas struktur belum diuji.
+6. **Tren TF besar → fast entry atau tunggu** (ide user, diuji cepat 11 Nov 2026; TP30/SL30, M1 Agu–Nov).
+   Tren = EMA20 vs EMA50 bar TF yang sudah close. Avg pips/trade, latih Agu–Sep | uji Okt–Nov:
+   - M15 searah → FAST: −2,08 | −0,37 · M15 lawan → FAST: −2,21 | −1,53 (searah sedikit lebih baik, konsisten)
+   - Aturan "M15 searah = FAST, lawan = skip": −2,08 | −0,37 (vs semua −2,14 | −0,96) — membaik kecil, masih negatif
+   - "lawan = tunggu MID/LAST": tidak lebih baik dari skip
+   - H1 dan H4: **tidak konsisten** (H4 searah lebih baik di Agu–Sep, terbalik di Okt–Nov)
+   Kesimpulan: tren M15 searah hanya sedikit membantu; H1/H4 tidak bisa dipakai sebagai aturan fast/tunggu.
+   Bisa dikombinasikan dengan filter FVG M5 (no. 1) saat evaluasi demo.
