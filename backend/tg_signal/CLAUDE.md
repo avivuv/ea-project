@@ -24,14 +24,18 @@ Full Python — tidak ada EA MQL5 untuk eksekusi.
 - Laporan harian (ZERO/MID/LAST-TP/SL) hanya rekap, bukan sinyal tutup.
 - Sinyal valid sampai hit TP/SL (dihitung dari zona); setelah itu tidak dipakai lagi — tanpa timeout, tanpa re-entry.
 
-## Menjalankan (setelah diimplementasi)
+## Menjalankan
+`python` di PATH adalah 3.14 — **pakai Python 3.10 Laragon** (MetaTrader5 & dependency terpasang di sana):
 ```powershell
 cd c:\laragon\www\ea-project\backend
-pip install -r requirements.txt
-pytest tg_signal/tests
-python -m tg_signal.tg_client --dump-history   # Tahap 1
-python -m tg_signal.backtest_tg                # Tahap 2
-python -m tg_signal.run_live                   # Tahap 3+ (mode dari .env, default LOG)
+$py = "C:\laragon\bin\python\python-3.10\python.exe"
+& $py -m pip install -r requirements.txt
+& $py -m pytest tg_signal/tests
+& $py -m tg_signal.tg_client --list-groups     # cari ID grup → TG_GROUP
+& $py -m tg_signal.tg_client --dump-history    # Tahap 1: riwayat → SQLite
+& $py -m tg_signal.ingest --stats              # hasil parse + kandidat gagal
+& $py -m tg_signal.tg_client --listen          # pesan baru real-time (log saja)
+# Tahap 2+: backtest_tg, run_live (belum dibuat)
 ```
 
 ## Env (`backend/.env`)

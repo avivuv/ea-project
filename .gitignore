@@ -32,3 +32,4 @@ Thumbs.db
 *.session
 *.session-journal
 backend/tg_signal/data/
+.pytest_cache/

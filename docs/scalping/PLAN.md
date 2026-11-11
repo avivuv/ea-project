@@ -1,6 +1,6 @@
 # Plan — Telegram Signal Scalper (XAUUSD)
 
-Branch: `scalping` · Bahasa: **full Python** · Status: **Tahap 0 (persiapan)**
+Branch: `scalping` · Bahasa: **full Python** · Status: **Tahap 1 (kode selesai, menunggu data grup asli)**
 
 Program yang membaca sinyal scalping XAUUSD dari grup Telegram, menunggu konfirmasi
 FVG/OB di M1/M5, lalu mengeksekusi order di MT5 — dengan dashboard web untuk monitoring.
@@ -40,10 +40,11 @@ Grup Telegram ──► tg_client (Telethon) ──► parser ──► price_re
 ```
 backend/tg_signal/
 ├── CLAUDE.md
-├── config_tg.py        # Parameter modul (dibaca dari config.py section TG_SIGNAL)
+├── settings.py         # Parameter modul (override via backend/.env)
 ├── tg_client.py        # Login, ambil riwayat grup, listen pesan baru
 ├── parser.py           # Parse pesan sinyal & laporan harian
 ├── price_resolver.py   # 2 digit → harga penuh
+├── ingest.py           # Pesan → Store sesuai jenis; --stats
 ├── store.py            # SQLite: messages, signals, trades, reports
 ├── confirmation.py     # Cek FVG / OB di M1-M5 (reuse fvg_detector, supply_demand)
 ├── signal_manager.py   # State machine per sinyal
@@ -68,12 +69,15 @@ backend/tg_signal/
 - [ ] Catat detail broker: digits XAUUSD, spread rata-rata, contract size
 
 ### Tahap 1 — Parser & pengambilan data
-- [ ] `parser.py` — sinyal + laporan, sesuai SIGNAL_SPEC
-- [ ] `price_resolver.py` — termasuk kasus lintas ratusan (`02-98`)
-- [ ] `tests/` — semua contoh di SIGNAL_SPEC jadi test case
-- [ ] `store.py` — skema SQLite
-- [ ] `tg_client.py` — login sekali (simpan session), dump seluruh riwayat grup ke SQLite
-- [ ] Laporan parser: berapa % sinyal ter-parse, daftar pesan gagal
+- [x] `parser.py` — sinyal + laporan, sesuai SIGNAL_SPEC
+- [x] `price_resolver.py` — termasuk kasus lintas ratusan (`02-98`)
+- [x] `tests/` — semua contoh di SIGNAL_SPEC jadi test case (24 test lulus)
+- [x] `store.py` — skema SQLite (`messages`, `signals`, `signal_events`, `report_lines`)
+- [x] `ingest.py` — proses satu pesan → simpan sesuai jenis, tangani edit
+- [x] `tg_client.py` — `--list-groups`, `--dump-history`, `--listen` (belum dites, butuh credential)
+- [x] Laporan parser: `python -m tg_signal.ingest --stats`
+- [ ] (User) Login pertama + dump riwayat grup asli
+- [ ] Review pesan gagal parse, tambah pola baru ke SIGNAL_SPEC bila perlu
 
 **Selesai bila:** ≥95% pesan sinyal ter-parse benar; sisanya tercatat untuk review manual.
 

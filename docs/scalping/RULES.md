@@ -1,7 +1,7 @@
 # Rules — Telegram Signal Scalper
 
 Aturan yang **wajib** dipatuhi oleh kode (dan oleh siapa pun yang mengubahnya).
-Angka default disimpan di `config.py` section `TG_SIGNAL`, bukan di-hardcode.
+Angka default disimpan di `backend/tg_signal/settings.py` (bisa di-override via `.env`), bukan di-hardcode.
 
 ---
 
