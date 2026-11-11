@@ -112,3 +112,33 @@ hasil sinyal sebelumnya yang sudah diketahui, ada/tidaknya aba-aba "NOW").
 
 Kesimpulan: dengan data harga + konteks sinyal, **belum ada pola yang bisa memilih sinyal TP**.
 Langkah lanjut: kumpulkan data demo live, uji maju hipotesis `dist_to_zero` tanpa mengubah EA.
+
+## Studi FVG sebagai filter kondisi (`fvg_context.py`, `fvg_study.py`) — 11 Nov 2026
+Ide dari user (sinyal SELL 51-55 jam 17:50 tepat di FVG bearish M5 4051.14–4053.20):
+entry langsung **hanya bila saat sinyal masuk sudah ada FVG searah di zona** (bukan menunggu konfirmasi).
+Entry market, SL 30 dari entry. Angka = pips/trade.
+
+| Aturan | TP30 Agu–Sep | TP30 Okt–Nov | TP20 Agu–Sep | TP20 Okt–Nov |
+|---|---|---|---|---|
+| Semua sinyal (EA sekarang) | −2,14 (1.484) | −0,96 (973) | −2,24 | −1,02 |
+| FVG M5 searah di zona | −0,24 (371) | +0,61 (245) | −0,75 | −0,41 |
+| FVG M5 searah, masih OPEN | +0,70 (172) | +1,50 (120) | −1,80 | +0,83 |
+| **FVG M5 searah + tanpa FVG M1 berlawanan di jalur TP** | **+1,49 (202)** | **+1,38 (130)** | +0,45 | +0,77 |
+| Tanpa FVG M5 searah | −2,78 | −1,48 | −2,73 | −1,22 |
+
+Validasi periode lama Okt 2025 – Jul 2026 (bar M5, angka absolut pesimis ±2,3 pips; lihat kalibrasi di atas):
+
+| Aturan | n | TP30 avg | vs semua |
+|---|---|---|---|
+| Semua sinyal | 7.052 | −3,72 | — |
+| FVG M5 searah di zona | 2.234 | −3,28 | +0,44 |
+| FVG M5 searah, masih OPEN | 1.293 | −2,90 | +0,82 |
+| Tanpa FVG M5 searah | 4.818 | −3,92 | −0,20 |
+
+Kesimpulan sementara:
+- Arah efeknya **konsisten di 3 periode**: sinyal dengan FVG M5 searah di zona lebih baik daripada tanpa.
+- Besarnya efek sedang (+0,4 s/d +1,5 pips/trade); di Agu–Nov 2026 cukup untuk positif, di periode lama
+  (setelah koreksi pesimisme M5) masih sekitar −0,6 s/d −1,0.
+- Sampel per aturan 120–200 trade per periode → masih bisa kebetulan; 11 aturan × 4 TP diuji.
+- Kandidat aturan terkuat: **FVG M5 searah di zona (masih open) + tanpa FVG M1 berlawanan di jalur TP**.
+  Perlu uji maju di data demo (dihitung ulang dari data M1, tanpa mengubah EA).
