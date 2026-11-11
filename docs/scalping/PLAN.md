@@ -46,7 +46,8 @@ backend/tg_signal/
 ├── price_resolver.py   # 2 digit → harga penuh
 ├── ingest.py           # Pesan → Store sesuai jenis; --stats
 ├── store.py            # SQLite: messages, signals, trades, reports
-├── confirmation.py     # Cek FVG / OB di M1-M5 (reuse fvg_detector, supply_demand)
+├── detectors/          # fvg.py, order_block.py, news_calendar.py (dipindah dari master)
+├── confirmation.py     # Cek FVG / OB di M1-M5 (pakai detectors/)
 ├── signal_manager.py   # State machine per sinyal
 ├── executor.py         # order_send, SL/TP, BE, close
 ├── backtest_tg.py      # Replay riwayat sinyal vs data M1

@@ -13,6 +13,8 @@ CREATE TABLE IF NOT EXISTS messages (
     id          INTEGER PRIMARY KEY,
     chat_id     INTEGER NOT NULL,
     msg_id      INTEGER NOT NULL,
+    sender_id   INTEGER,
+    sender_name TEXT,
     date_utc    TEXT    NOT NULL,
     edit_utc    TEXT,
     text        TEXT    NOT NULL,
@@ -50,6 +52,7 @@ CREATE TABLE IF NOT EXISTS report_lines (
     id          INTEGER PRIMARY KEY,
     message_id  INTEGER NOT NULL REFERENCES messages(id),
     report_date TEXT    NOT NULL,
+    seq         INTEGER NOT NULL,              -- urutan baris di pesan (nomor bisa dobel)
     no          INTEGER NOT NULL,
     direction   TEXT    NOT NULL,
     level_first INTEGER NOT NULL,
@@ -57,7 +60,7 @@ CREATE TABLE IF NOT EXISTS report_lines (
     win         INTEGER,
     depth       TEXT    NOT NULL,
     outcome     TEXT    NOT NULL,
-    UNIQUE (message_id, no)
+    UNIQUE (message_id, seq)
 );
 
 CREATE INDEX IF NOT EXISTS idx_signals_status ON signals(status);
@@ -85,7 +88,8 @@ class Store:
 
     # ── messages ────────────────────────────────────────────────────────────
     def upsert_message(self, chat_id: int, msg_id: int, date: datetime,
-                       text: str, kind: str, edit_date: datetime | None = None) -> tuple[int, bool]:
+                       text: str, kind: str, edit_date: datetime | None = None,
+                       sender_id: int | None = None, sender_name: str | None = None) -> tuple[int, bool]:
         """Return (message_row_id, changed). changed=False bila teks identik sudah ada."""
         row = self.conn.execute(
             "SELECT id, text FROM messages WHERE chat_id=? AND msg_id=?", (chat_id, msg_id)
@@ -101,11 +105,16 @@ class Store:
             self.conn.commit()
             return row["id"], True
         cur = self.conn.execute(
-            "INSERT INTO messages (chat_id, msg_id, date_utc, edit_utc, text, kind) VALUES (?,?,?,?,?,?)",
-            (chat_id, msg_id, utc_iso(date), edit_iso, text, kind),
+            """INSERT INTO messages (chat_id, msg_id, sender_id, sender_name, date_utc, edit_utc, text, kind)
+               VALUES (?,?,?,?,?,?,?,?)""",
+            (chat_id, msg_id, sender_id, sender_name, utc_iso(date), edit_iso, text, kind),
         )
         self.conn.commit()
         return cur.lastrowid, True
+
+    def max_msg_id(self, chat_id: int) -> int:
+        row = self.conn.execute("SELECT MAX(msg_id) FROM messages WHERE chat_id=?", (chat_id,)).fetchone()
+        return row[0] or 0
 
     # ── signals ─────────────────────────────────────────────────────────────
     def upsert_signal(self, message_id: int, received: datetime, direction: str,
@@ -155,10 +164,10 @@ class Store:
     def replace_report_lines(self, message_id: int, report_date: str, lines: list) -> None:
         self.conn.execute("DELETE FROM report_lines WHERE message_id=?", (message_id,))
         self.conn.executemany(
-            """INSERT INTO report_lines (message_id, report_date, no, direction, level_first,
-               level_last, win, depth, outcome) VALUES (?,?,?,?,?,?,?,?,?)""",
-            [(message_id, report_date, ln.no, ln.direction, ln.level_first, ln.level_last,
-              None if ln.win is None else int(ln.win), ln.depth, ln.outcome) for ln in lines],
+            """INSERT INTO report_lines (message_id, report_date, seq, no, direction, level_first,
+               level_last, win, depth, outcome) VALUES (?,?,?,?,?,?,?,?,?,?)""",
+            [(message_id, report_date, seq, ln.no, ln.direction, ln.level_first, ln.level_last,
+              None if ln.win is None else int(ln.win), ln.depth, ln.outcome) for seq, ln in enumerate(lines, 1)],
         )
         self.conn.commit()
 

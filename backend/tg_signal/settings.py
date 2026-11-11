@@ -30,6 +30,8 @@ SESSION_PATH = DATA_DIR / "tg_session"          # Telethon menambah ".session"
 TG_API_ID = os.getenv("TG_API_ID", "")
 TG_API_HASH = os.getenv("TG_API_HASH", "")
 TG_GROUP = os.getenv("TG_GROUP", "")            # username, link, atau ID numerik
+# Grup forum: hanya baca topik ini (topik "Scalping" = 1090). 0 = semua pesan grup.
+TG_TOPIC_ID = int(os.getenv("TG_TOPIC_ID", "1090") or 0)
 
 # ── Instrumen ───────────────────────────────────────────────────────────────
 SYMBOL = os.getenv("TG_SYMBOL", "XAUUSD")

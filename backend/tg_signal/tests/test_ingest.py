@@ -43,6 +43,13 @@ def test_edit_ignored_after_open():
     assert (sig["level_first"], sig["status"]) == (62, "OPEN")
 
 
+def test_report_with_duplicate_numbers():
+    st = Store()
+    text = "Report Senin (09-11-2026)\n1. BUY 62-58 ✅ ZERO-TP\n1. SELL 42-46 ✅ MID-TP"
+    assert ingest_message(st, 1, 20, T0, text) == "REPORT"
+    assert st.counts()["report_lines"] == 2
+
+
 def test_report_edit_replaces_lines():
     st = Store()
     ingest_message(st, 1, 11, T0, REPORT_11_11_2026)

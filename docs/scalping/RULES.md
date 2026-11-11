@@ -65,7 +65,7 @@ Setiap transisi **dicatat** di SQLite dengan timestamp dan alasan.
 | Daily loss limit | `TG_DAILY_LOSS_USD` (mis. $10 untuk lot 0.01) → pause sampai hari berikut |
 | Max spread | `TG_MAX_SPREAD_PIPS` = 5 → skip entry |
 | Duplikat zona | sinyal baru dengan arah sama & zona overlap posisi terbuka → REJECTED |
-| News | pause ±`TG_NEWS_PAUSE_MIN` menit di sekitar high-impact USD (`forex_calendar.py`) |
+| News | pause ±`TG_NEWS_PAUSE_MIN` menit di sekitar high-impact USD (`detectors/news_calendar.py`) |
 | Kill switch | file `backend/tg_signal/data/PAUSE` ada → tidak buka order baru |
 
 Bila MT5 terputus atau data harga basi (> 10 detik): tidak buka order baru, tetap pantau posisi.
@@ -85,7 +85,7 @@ Bila MT5 terputus atau data harga basi (> 10 detik): tidak buka order baru, teta
 - Komentar & docstring Bahasa Indonesia, konsisten dengan kode yang sudah ada.
 - Logika murni (parser, resolver, state machine, konfirmasi) **tidak boleh** import `MetaTrader5`/`telethon`
   — supaya bisa dites dan dipakai backtest. I/O hanya di `tg_client.py`, `executor.py`, `store.py`.
-- Reuse `fvg_detector.py` / `supply_demand.py`; jangan duplikasi deteksi FVG/OB.
+- Reuse `tg_signal/detectors/` (`fvg.py`, `order_block.py`); jangan duplikasi deteksi FVG/OB.
 - Waktu disimpan dalam **UTC**; konversi ke waktu server MT5 / WIB hanya untuk tampilan.
 - Setiap perubahan parser wajib disertai test case dari pesan asli.
 - Jalankan `pytest backend/tg_signal/tests` sebelum commit.

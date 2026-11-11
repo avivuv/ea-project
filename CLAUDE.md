@@ -1,65 +1,37 @@
-# EA Trading Project
+# EA Project — branch `scalping`: Telegram Signal Scalper (XAUUSD)
 
-Sistem trading otomatis (Expert Advisor) berbasis Python backend + MQL5 client dengan AI filter menggunakan Gemini 2.5 Flash.
+Full Python. Membaca sinyal scalping XAUUSD dari topik **Scalping** di grup forum Telegram
+(Telethon, hanya baca), menunggu konfirmasi FVG/OB di M1/M5, eksekusi via library `MetaTrader5`,
+monitoring lewat dashboard NiceGUI.
 
-## Struktur Project
+> Branch `master` berisi project lama (FastAPI + EA MQL5 + strategi H4/D1). File-file itu
+> sengaja dihapus dari branch ini; lihat `git show master:<path>` bila perlu referensi.
 
+## Dokumen
+- [docs/scalping/PLAN.md](docs/scalping/PLAN.md) — tahapan, status, keputusan
+- [docs/scalping/SIGNAL_SPEC.md](docs/scalping/SIGNAL_SPEC.md) — format pesan & konversi harga
+- [docs/scalping/RULES.md](docs/scalping/RULES.md) — mode, state machine, risk, keamanan, coding
+- [backend/tg_signal/CLAUDE.md](backend/tg_signal/CLAUDE.md) — panduan modul & perintah
+
+## Struktur
 ```
 ea-project/
-├── backend/
-│   ├── main.py              # FastAPI server, port 8000
-│   ├── config.py            # Semua parameter (pairs, risk, indikator)
-│   ├── technical_signal.py  # Kalkulasi EMA/RSI/ATR via library ta
-│   ├── risk_manager.py      # Position sizing, circuit breaker, session filter
-│   ├── ai_filter.py         # Gemini 2.5 Flash integration + cache 4 jam
-│   ├── .env                 # GEMINI_API_KEY (jangan di-commit)
-│   ├── state/               # Risk state harian (JSON, auto-generated)
-│   └── logs/                # Log semua keputusan EA
-└── mql5/
-    └── EA_Brain_Client.mq5  # EA script untuk MetaTrader 5
-```
-
-## Menjalankan Backend
-
-```powershell
-cd c:\laragon\www\ea-project\backend
-python main.py
-# Server berjalan di http://0.0.0.0:8000
+├── docs/scalping/           # PLAN, SIGNAL_SPEC, RULES
+└── backend/
+    ├── .env                 # credential Telegram (jangan di-commit / dibaca)
+    ├── requirements.txt
+    └── tg_signal/           # seluruh kode
+        ├── detectors/       # fvg.py, order_block.py, news_calendar.py
+        ├── data/            # SQLite + session Telethon (gitignored)
+        └── tests/
 ```
 
 ## Environment
+- **Python 3.10 Laragon**: `C:\laragon\bin\python\python-3.10\python.exe`
+  (`python` di PATH = 3.14, jangan dipakai)
+- `pip install -r backend/requirements.txt`
 
-- Python 3.10.6 (Laragon)
-- Dependencies: `pip install -r requirements.txt`
-- AI: Gemini 2.5 Flash via Google AI Studio API key
-
-## Endpoints
-
-- `GET  /health`       — cek server hidup
-- `POST /analyze`      — terima OHLCV dari MT5, return BUY/SELL/HOLD + lot/SL/TP
-- `POST /trade-event`  — MT5 lapor open/close trade untuk update risk state
-
-## Strategi
-
-Trend-Following H4/D1, 4-gate validation:
-1. Session filter (London + NY hours GMT)
-2. Technical signal: EMA50 > EMA200, RSI 45-65, close > EMA50
-3. AI fundamental filter: Gemini 2.5 Flash sebagai veto
-4. Risk check: 1% risk/trade, max 2 posisi, daily loss limit 3%
-
-## Parameter Utama (config.py)
-
-- Pairs: EURUSD, GBPUSD, USDJPY
-- SL: 1.5 × ATR | TP: 2.5 × ATR | Trailing: 1 × ATR
-- Max drawdown: 12% → EA pause otomatis
-
-## Modul Scalping Telegram (branch `scalping`)
-
-Program terpisah, full Python: baca sinyal scalping XAUUSD dari grup Telegram (Telethon),
-konfirmasi FVG/OB di M1/M5, eksekusi via library `MetaTrader5`, dashboard NiceGUI.
-
-- Kode: `backend/tg_signal/` (punya CLAUDE.md sendiri)
-- Plan & status: [docs/scalping/PLAN.md](docs/scalping/PLAN.md)
-- Format sinyal: [docs/scalping/SIGNAL_SPEC.md](docs/scalping/SIGNAL_SPEC.md)
-- Aturan trading/risk/keamanan: [docs/scalping/RULES.md](docs/scalping/RULES.md)
-- Default mode `LOG` (tanpa order). Jangan jalankan eksekusi di akun LIVE.
+## Aturan penting
+- Komunikasi dalam Bahasa Indonesia.
+- Mode default `LOG` (tanpa order). Jangan pernah eksekusi di akun LIVE.
+- Jangan baca/tampilkan/commit `.env`, `*.session`, atau isi `tg_signal/data/`.

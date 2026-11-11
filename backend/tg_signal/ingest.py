@@ -15,7 +15,8 @@ from tg_signal.store import Store
 
 def ingest_message(store: Store, chat_id: int, msg_id: int, date: datetime,
                    text: str, edit_date: datetime | None = None,
-                   default_sl_pips: float = 30) -> str:
+                   default_sl_pips: float = 30, sender_id: int | None = None,
+                   sender_name: str | None = None) -> str:
     """Return kind pesan: SIGNAL | REPORT | OTHER | EMPTY | UNCHANGED."""
     text = (text or "").strip()
     if not text:
@@ -25,7 +26,8 @@ def ingest_message(store: Store, chat_id: int, msg_id: int, date: datetime,
     signal = None if report else parser.parse_signal(text, default_sl_pips)
     kind = "REPORT" if report else "SIGNAL" if signal else "OTHER"
 
-    message_id, changed = store.upsert_message(chat_id, msg_id, date, text, kind, edit_date)
+    message_id, changed = store.upsert_message(chat_id, msg_id, date, text, kind, edit_date,
+                                               sender_id, sender_name)
     if not changed:
         return "UNCHANGED"
 
