@@ -194,3 +194,9 @@ Dicatat 11 Nov 2026 — **dievaluasi saat analisa hasil demo, tanpa mengubah EA*
 7. **Perbedaan feed harga** (SELL 51-55, 11 Nov 2026): di Exness harga tertinggi 4054.36 (18:07 WIB), LAST 4055
    tidak tersentuh, padahal di chart user (feed lain) tampak sampai LAST. Feed bisa beda $0,3–0,6.
    Bila memakai limit di LAST/MID, pasang sedikit sebelum level (mis. −5 pips) agar tidak meleset.
+8. **TP dinamis menurut tren besar** (ide user, diuji 11 Nov 2026; entry langsung, SL 30). Avg pips/trade
+   (rata-rata Agu–Sep & Okt–Nov): TP tetap 30 = −1,55 · TP tetap 20 = −1,63 · M15 searah 30/lawan 20 = −1,61 ·
+   H1 searah 30/lawan 20 = −1,74 · H4 searah 30/lawan 20 = −1,70. Kontrol terbalik (searah 20/lawan 30)
+   −1,43 s/d −1,56 → selisih antar aturan hanya noise. **TP dinamis berdasarkan tren tidak membantu**;
+   besar TP (10–30) sendiri hampir tidak mengubah hasil. Yang lebih berpengaruh: sinyal mana yang diambil
+   (filter FVG M5, no. 1) dan posisi SL (no. 5).
