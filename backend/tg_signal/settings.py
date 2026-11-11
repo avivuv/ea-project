@@ -65,6 +65,7 @@ TG_MAX_ZONE_DISTANCE = _f("TG_MAX_ZONE_DISTANCE", 15.0)   # dalam $ harga
 TG_ZONE_WIDTH_MIN = _f("TG_ZONE_WIDTH_MIN", 1)
 TG_ZONE_WIDTH_MAX = _f("TG_ZONE_WIDTH_MAX", 10)
 TG_DUPLICATE_WINDOW_SEC = _i("TG_DUPLICATE_WINDOW_SEC", 300)
+TG_POLL_SEC = _f("TG_POLL_SEC", 3)          # cek aktif pesan baru (push Telegram bisa telat ±60 dtk)
 
 # ── Eksekusi (Tahap 4, akun demo) ───────────────────────────────────────────
 TG_ENTRY_MODE = os.getenv("TG_ENTRY_MODE", "MARKET")    # entry market saat sinyal diterima

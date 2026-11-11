@@ -17,7 +17,7 @@ import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
 
-from telethon import events
+from telethon import errors, events
 
 from tg_signal import settings
 from tg_signal.executor import MT5Executor
@@ -151,22 +151,53 @@ async def run(mode: str) -> None:
     await client.start()
     entity = await client.get_entity(_group_ref())
 
-    async def on_message(event) -> None:
-        msg = event.message
+    state = {"last_id": 0}
+    latest = await client.get_messages(entity, limit=1, reply_to=settings.TG_TOPIC_ID or None)
+    if latest:
+        state["last_id"] = latest[0].id               # pesan lama tidak dieksekusi ulang
+
+    def process(msg, via: str, is_edit: bool) -> None:
+        """Satu jalur untuk push (event) dan polling. Sinkron → tidak ada balapan antar keduanya."""
         if not in_topic(msg, settings.TG_TOPIC_ID):
             return
+        if not is_edit:
+            if msg.id <= state["last_id"] and via == "poll":
+                return
+            state["last_id"] = max(state["last_id"], msg.id)
         kind = ingest_message(store, entity.id, msg.id, msg.date, msg.message or "", msg.edit_date,
                               settings.TG_DEFAULT_SL_PIPS, msg.sender_id, _sender_name(msg))
+        if kind == "UNCHANGED":
+            return
+        lag = (datetime.now(timezone.utc) - msg.date).total_seconds()
         first = (msg.message or "").strip().splitlines()[0][:50] if msg.message else ""
-        log.info("pesan #%s [%s] %s", msg.id, kind, first)
-        if kind == "SIGNAL" and not isinstance(event, events.MessageEdited.Event):
+        log.info("pesan #%s [%s] via %s, jeda %.0f dtk | %s", msg.id, kind, via, lag, first)
+        if kind == "SIGNAL" and not is_edit:
             try:
                 trader.handle_signal(entity.id, msg.id)
             except Exception:  # jangan sampai listener mati karena satu sinyal
                 log.exception("gagal memproses sinyal #%s", msg.id)
 
+    async def on_message(event) -> None:
+        process(event.message, "push", isinstance(event, events.MessageEdited.Event))
+
     client.add_event_handler(on_message, events.NewMessage(chats=entity))
     client.add_event_handler(on_message, events.MessageEdited(chats=entity))
+
+    async def poll_loop() -> None:
+        """Telegram sering menunda push untuk grup besar (sampai ±60 dtk) → cek aktif tiap POLL_SEC."""
+        while True:
+            await asyncio.sleep(settings.TG_POLL_SEC)
+            try:
+                msgs = await client.get_messages(entity, limit=5, reply_to=settings.TG_TOPIC_ID or None)
+                for m in sorted(msgs, key=lambda x: x.id):
+                    process(m, "poll", False)
+            except errors.FloodWaitError as e:
+                log.warning("FloodWait %s dtk dari Telegram, polling dijeda", e.seconds)
+                await asyncio.sleep(e.seconds + 1)
+            except Exception:
+                log.exception("polling gagal")
+
+    asyncio.create_task(poll_loop())
 
     async def sync_loop() -> None:
         while True:
