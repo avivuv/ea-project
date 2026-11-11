@@ -142,3 +142,26 @@ Kesimpulan sementara:
 - Sampel per aturan 120–200 trade per periode → masih bisa kebetulan; 11 aturan × 4 TP diuji.
 - Kandidat aturan terkuat: **FVG M5 searah di zona (masih open) + tanpa FVG M1 berlawanan di jalur TP**.
   Perlu uji maju di data demo (dihitung ulang dari data M1, tanpa mengubah EA).
+
+## Strategi sendiri: CHoCH + FVG + entry retest (`smc_strategy.py`) — 11 Nov 2026
+Ide dari pengamatan admin (di luar topik Scalping). 48 variasi: TF M3/M5 × CHoCH (struktur berlawanan
+dulu) / BOS biasa × entry tepi/tengah FVG × 1,5R/2R/3R × semua jam / London+NY. SL di bawah kaki impuls
+(median ±40–55 pips), 1 setup aktif pada satu waktu, eksekusi bar M1 dengan spread asli.
+
+| Variasi | Latih Agu–Sep (trade, WR, avg R) | Uji Okt–Nov (trade, WR, avg R) |
+|---|---|---|
+| M3 CHoCH, entry tepi FVG, 2R | 120, 35,8%, +0,08 | 84, 34,5%, **+0,04** |
+| M3 CHoCH, entry tengah FVG, 2R | 106, 34,9%, +0,08 | 71, 33,8%, **+0,01** |
+| M3 BOS, entry tepi, 2R (terbaik #2 di latih) | 208, 38,0%, +0,14 | 142, 28,9%, −0,13 |
+| M5 CHoCH, tengah, 1,5R (terbaik #1 di latih) | 32, 50,0%, +0,25 | 32, 28,1%, −0,30 |
+
+- Hanya **2 dari 48** variasi positif di latih dan uji, keduanya ±0 (+0,01 s/d +0,04 R/trade).
+- Variasi terbaik di latih (M3 BOS, M5 CHoCH) **berbalik negatif** di uji → kebetulan.
+- CHoCH (syarat struktur berlawanan) konsisten lebih baik daripada BOS biasa di M3.
+- Periode lama (M5, Okt 2025 – Jul 2026): variasi terbaik lain lagi (M5 BOS mid 2R London/NY +0,07 R),
+  sebagian besar sekitar 0 s/d −0,08 R → tidak konsisten antar periode.
+
+Kesimpulan: versi mekanis CHoCH + FVG ≈ **impas, belum ada edge**. Penilaian admin (konteks, sweep
+likuiditas, bias TF besar, kualitas impuls) kemungkinan yang membuat setup manualnya bagus.
+Langkah lanjut yang masuk akal: kumpulkan contoh setup asli admin (dari topik lain di grup) untuk
+mengkalibrasi definisi, lalu uji tambahan syarat sweep likuiditas & bias H1 — dengan risiko overfitting.
