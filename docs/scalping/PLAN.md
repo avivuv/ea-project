@@ -176,3 +176,10 @@ Dicatat 11 Nov 2026 — **dievaluasi saat analisa hasil demo, tanpa mengubah EA*
    - **B. Sinyal sendiri (fokus utama, strategi terpisah dari sinyal Telegram)**: EA deteksi CHoCH + FVG sendiri, entry saat retest ke FVG, SL di bawah
      swing low (contoh: entry 4049.16, SL 4046.53, TP 4054.60 ≈ 2R). Basis kode CHoCH:
      `detectors/order_block.py` (`detect_choch`, perlu disesuaikan ke M3/M5).
+5. **SL berbasis struktur di LAST** (contoh SELL 51-55, 11 Nov 2026 17:50 WIB) — EA entry 4050.99,
+   SL 30 pips = 4053.99 kena 18:06 (bid tertinggi 4053.93, ask ±4054.10 karena spread). LAST 4055
+   belum tersentuh. Di sekitar LAST ada area supply: FVG bearish M5 4053.99–4054.72 (16:15) dan swing
+   high ±4055.9 (17:05) → SL kita persis di bawah area itu. Ide: SL sedikit di atas struktur terdekat
+   di/di atas LAST (FVG/swing high) + buffer spread, bukan jarak tetap 30 pips. Catatan: versi kasar
+   "SL = LAST ± 30 pips" sudah diuji dan lebih buruk (MARKET TP30: −2,51 vs −1,67 pips/trade) karena
+   risiko ±70 pips; versi presisi di atas struktur belum diuji.
