@@ -44,6 +44,9 @@ def in_topic(msg, topic_id: int) -> bool:
 
 
 def _sender_name(msg) -> str | None:
+    # Admin anonim bertanda tangan ("Admin 3"): from_id kosong, nama ada di post_author
+    if msg.post_author:
+        return msg.post_author
     s = msg.sender
     if s is None:
         return getattr(msg.chat, "title", None) if msg.post else None

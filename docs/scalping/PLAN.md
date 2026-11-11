@@ -1,6 +1,6 @@
 # Plan — Telegram Signal Scalper (XAUUSD)
 
-Branch: `scalping` · Bahasa: **full Python** · Status: **Tahap 1 (kode selesai, menunggu data grup asli)**
+Branch: `scalping` · Bahasa: **full Python** · Status: **Tahap 1 selesai → lanjut Tahap 2 (backtest)**
 
 Program yang membaca sinyal scalping XAUUSD dari grup Telegram, menunggu konfirmasi
 FVG/OB di M1/M5, lalu mengeksekusi order di MT5 — dengan dashboard web untuk monitoring.
@@ -72,15 +72,23 @@ backend/tg_signal/
 ### Tahap 1 — Parser & pengambilan data
 - [x] `parser.py` — sinyal + laporan, sesuai SIGNAL_SPEC
 - [x] `price_resolver.py` — termasuk kasus lintas ratusan (`02-98`)
-- [x] `tests/` — semua contoh di SIGNAL_SPEC jadi test case (24 test lulus)
+- [x] `tests/` — semua contoh di SIGNAL_SPEC jadi test case (50 test lulus)
 - [x] `store.py` — skema SQLite (`messages`, `signals`, `signal_events`, `report_lines`)
-- [x] `ingest.py` — proses satu pesan → simpan sesuai jenis, tangani edit
-- [x] `tg_client.py` — `--list-groups`, `--dump-history`, `--listen` (belum dites, butuh credential)
+- [x] `ingest.py` — proses satu pesan → simpan sesuai jenis, tangani edit; `--reparse`
+- [x] `tg_client.py` — `--list-groups`, `--dump-history`, `--listen`; filter topik forum
 - [x] Laporan parser: `python -m tg_signal.ingest --stats`
-- [ ] (User) Login pertama + dump riwayat grup asli
-- [ ] Review pesan gagal parse, tambah pola baru ke SIGNAL_SPEC bila perlu
+- [x] Login + dump riwayat topik Scalping (43.966 pesan, Jun 2025 – Nov 2026)
+- [x] Review pesan gagal parse → variasi format ditambahkan ke SIGNAL_SPEC
 
 **Selesai bila:** ≥95% pesan sinyal ter-parse benar; sisanya tercatat untuk review manual.
+✅ **Selesai** — sisa ~38 pesan mirip sinyal tidak ter-parse (typo berat), <0,4%.
+
+**Hasil data (Okt 2025 – 11 Nov 2026):**
+- 11.022 pesan sinyal → **9.551 sinyal unik** (dedup arah+zona ≤5 menit), rata-rata **~35 sinyal/hari**
+- Jumlah sinyal unik per hari cocok dengan jumlah baris laporan (selisih 0–1)
+- Laporan tersedia 26 Nov 2025 – 11 Nov 2026 (236 hari). Klaim provider:
+  ZERO-TP 51,4% · MID-TP 27,6% · LAST-TP 10,0% · LAST-SL 11,0% → **win 89%**
+- Topik hanya diisi admin bertanda tangan (Admin 1/2/3/2+1/4) — tidak perlu filter pengirim
 
 ### Tahap 2 — Backtest & validasi
 - [ ] Ambil data M1 XAUUSD dari MT5 untuk rentang tanggal riwayat sinyal

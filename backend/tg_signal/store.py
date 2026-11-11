@@ -56,7 +56,7 @@ CREATE TABLE IF NOT EXISTS report_lines (
     no          INTEGER NOT NULL,
     direction   TEXT    NOT NULL,
     level_first INTEGER NOT NULL,
-    level_last  INTEGER NOT NULL,
+    level_last  INTEGER,
     win         INTEGER,
     depth       TEXT    NOT NULL,
     outcome     TEXT    NOT NULL,
@@ -118,25 +118,27 @@ class Store:
 
     # ── signals ─────────────────────────────────────────────────────────────
     def upsert_signal(self, message_id: int, received: datetime, direction: str,
-                      level_first: int, level_last: int, sl_pips: float) -> int:
+                      level_first: int, level_last: int, sl_pips: float,
+                      flags: list[str] | None = None) -> int:
         """Sinyal baru, atau update bila pesan diedit dan status masih NEW/WAITING."""
         row = self.conn.execute(
             "SELECT id, status FROM signals WHERE message_id=?", (message_id,)
         ).fetchone()
         if row is None:
             cur = self.conn.execute(
-                """INSERT INTO signals (message_id, received_utc, direction, level_first, level_last, sl_pips)
-                   VALUES (?,?,?,?,?,?)""",
-                (message_id, utc_iso(received), direction, level_first, level_last, sl_pips),
+                """INSERT INTO signals (message_id, received_utc, direction, level_first, level_last,
+                   sl_pips, flags) VALUES (?,?,?,?,?,?,?)""",
+                (message_id, utc_iso(received), direction, level_first, level_last, sl_pips,
+                 ",".join(flags or [])),
             )
             self.conn.commit()
             return cur.lastrowid
         if row["status"] in ("NEW", "WAITING"):
             self.conn.execute(
                 """UPDATE signals SET direction=?, level_first=?, level_last=?, sl_pips=?,
-                   ref_price=NULL, zero=NULL, last=NULL, flags='', status='NEW', status_reason='edited'
+                   ref_price=NULL, zero=NULL, last=NULL, flags=?, status='NEW', status_reason='edited'
                    WHERE id=?""",
-                (direction, level_first, level_last, sl_pips, row["id"]),
+                (direction, level_first, level_last, sl_pips, ",".join(flags or []), row["id"]),
             )
             self.conn.commit()
         return row["id"]
@@ -170,6 +172,20 @@ class Store:
               None if ln.win is None else int(ln.win), ln.depth, ln.outcome) for seq, ln in enumerate(lines, 1)],
         )
         self.conn.commit()
+
+    def reset_derived(self) -> None:
+        """Hapus tabel turunan (sinyal, event, laporan) supaya bisa di-parse ulang dari messages."""
+        self.conn.executescript(
+            "DROP TABLE IF EXISTS signal_events; DROP TABLE IF EXISTS signals;"
+            " DROP TABLE IF EXISTS report_lines;"
+        )
+        self.conn.executescript(SCHEMA)
+
+    def all_messages(self) -> list[sqlite3.Row]:
+        return self.conn.execute("SELECT * FROM messages ORDER BY chat_id, msg_id").fetchall()
+
+    def set_kind(self, message_id: int, kind: str) -> None:
+        self.conn.execute("UPDATE messages SET kind=? WHERE id=?", (kind, message_id))
 
     # ── statistik ───────────────────────────────────────────────────────────
     def counts(self) -> dict[str, int]:

@@ -31,12 +31,32 @@ def ingest_message(store: Store, chat_id: int, msg_id: int, date: datetime,
     if not changed:
         return "UNCHANGED"
 
+    _save_parsed(store, message_id, date, report, signal)
+    return kind
+
+
+def _save_parsed(store: Store, message_id: int, date: datetime, report, signal) -> None:
     if report:
         store.replace_report_lines(message_id, report.report_date.isoformat(), report.lines)
     elif signal:
-        store.upsert_signal(message_id, date, signal.direction,
-                            signal.level_first, signal.level_last, signal.sl_pips)
-    return kind
+        store.upsert_signal(message_id, date, signal.direction, signal.level_first,
+                            signal.level_last, signal.sl_pips, signal.flags)
+
+
+def reparse_all(store: Store, default_sl_pips: float = 30) -> dict[str, int]:
+    """Parse ulang semua pesan tersimpan (setelah parser diubah) tanpa dump ulang Telegram."""
+    store.reset_derived()
+    counts: dict[str, int] = {}
+    for row in store.all_messages():
+        text = row["text"]
+        report = parser.parse_report(text)
+        signal = None if report else parser.parse_signal(text, default_sl_pips)
+        kind = "REPORT" if report else "SIGNAL" if signal else "OTHER"
+        store.set_kind(row["id"], kind)
+        _save_parsed(store, row["id"], datetime.fromisoformat(row["date_utc"]), report, signal)
+        counts[kind] = counts.get(kind, 0) + 1
+    store.conn.commit()
+    return counts
 
 
 def _print_stats(store: Store, show_suspect: int) -> None:
@@ -59,10 +79,13 @@ def main() -> None:
 
     ap = argparse.ArgumentParser(description="Statistik database tg_signal")
     ap.add_argument("--stats", action="store_true")
+    ap.add_argument("--reparse", action="store_true", help="parse ulang semua pesan di database")
     ap.add_argument("--show", type=int, default=20, help="jumlah kandidat gagal parse yang ditampilkan")
     args = ap.parse_args()
     store = Store(settings.DB_PATH)
     try:
+        if args.reparse:
+            print("Reparse:", reparse_all(store, settings.TG_DEFAULT_SL_PIPS))
         _print_stats(store, args.show)
     finally:
         store.close()

@@ -50,3 +50,8 @@ def test_width_suspect_flag():
 def test_resolve_level_invalid():
     with pytest.raises(ValueError):
         resolve_level(100, 4150.0)
+
+
+def test_full_price_level_kept():
+    z = resolve_zone("BUY", 4162, 4158, 4170.0)
+    assert (z.zero, z.last) == (4162, 4158)

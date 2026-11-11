@@ -10,9 +10,12 @@ from dataclasses import dataclass, field
 
 
 def resolve_level(n: int, ref: float) -> float:
-    """2 digit terakhir bagian bulat → kandidat harga terdekat dari `ref`."""
+    """2 digit terakhir bagian bulat → kandidat harga terdekat dari `ref`.
+    Level ≥ 1000 dianggap sudah harga penuh."""
+    if n >= 1000:
+        return float(n)
     if not 0 <= n <= 99:
-        raise ValueError(f"level harus 0-99, dapat {n}")
+        raise ValueError(f"level harus 0-99 atau harga penuh ≥1000, dapat {n}")
     base = math.floor(ref / 100) * 100
     candidates = (base - 100 + n, base + n, base + 100 + n)
     return float(min(candidates, key=lambda c: abs(c - ref)))

@@ -37,11 +37,33 @@ Cek Pesan yg di-PIN ya gaesss... DYOR
 
 Simbol selalu **XAUUSD** (grup ini khusus gold). Teks lain diabaikan.
 
+### Variasi yang ditemukan di riwayat grup (Okt 2025 – Nov 2026)
+Pengirim selalu admin bertanda tangan (`Admin 1`, `Admin 2`, `Admin 3`, `Admin 2+1`, `Admin 4`).
+Format 2-digit dipakai sejak **Oktober 2025**; sebelumnya format bebas (diabaikan).
+
+| Bentuk baris pertama | Contoh |
+|---|---|
+| standar | `BUY 62-58` |
+| prefix simbol | `GOLD BUY 62-58`, `GOL BUY 62-58`, `XAUUSD BUY ...`, `BOLEH BUY LAGI 62-58` |
+| simbol/kata setelah arah | `BUY GOLD 62-58`, `SELL ZONE 60-64`, `BUY GOLD ZONE 62-58`, `SELL NOW 62-66`, `SELL LAGI ...` |
+| typo arah | `BBUY`, `BBBUY`, `SELLL`, `SELLN` |
+| harga penuh 4 digit | `BUY 4162-4158` → dipakai apa adanya |
+| typo 3 digit | `SELL 62-666` → ambil 2 digit terakhir + flag `LEVEL_TYPO` |
+
+Sering ada **pesan pendek lalu pesan lengkap** dengan zona sama ±1 menit
+(`GOLD BUY 95-91` lalu `GOLD BUY 95-91 + teks`) → ditangani aturan duplikat di bawah.
+
 ### Regex acuan
 ```python
-SIGNAL_RE = re.compile(r"^\s*(BUY|SELL)\s+(\d{1,2})\s*[-–]\s*(\d{1,2})\b", re.I | re.M)
+PREFIX = r"(?:(?:GOLD|GOL|XAU|XAUUSD|BOLEH|ENTRY)\s+)*"
+DIRECTION = r"(B+U+Y+|S+E+L+N?)"                 # dinormalisasi lewat huruf pertama
+MIDWORD = r"(?:(?:GOLD|GOL|XAU|XAUUSD|ZONE|ZONA|NOW|LAGI)\s+)*"
+SIGNAL_RE = re.compile(rf"^\s*{PREFIX}{DIRECTION}\s+{MIDWORD}(\d{{1,4}})\s*[-–]\s*(\d{{1,4}})\b", re.I | re.M)
 SL_RE     = re.compile(r"\bSL\s*:?\s*(\d+)\s*pips?\b", re.I)
 ```
+
+Level 1–2 digit = 2 digit terakhir (di-resolve). Level 4 digit = harga penuh.
+Level 3 digit = typo → `n % 100` + flag `LEVEL_TYPO`.
 
 ### Validasi
 | Aturan | Jika gagal |
@@ -120,16 +142,22 @@ Report Rabu (11-11-2026)
 
 ### Regex acuan
 ```python
-REPORT_HEADER_RE = re.compile(r"^\s*Report\s+\w+\s*\((\d{2})-(\d{2})-(\d{4})\)", re.I | re.M)
+REPORT_HEADER_RE = re.compile(
+    r"^\s*Report\s+[\w'’]+\s*\((\d{1,2})\s*-\s*(\d{1,2})\s*-\s*(\d{4})\)", re.I | re.M)
 REPORT_LINE_RE   = re.compile(
-    r"^\s*(\d+)\.\s*(BUY|SELL)\s+(\d{1,2})\s*[-–]\s*(\d{1,2})\s*(✅|❌)?\s*(ZERO|MID|LAST)-(TP|SL)",
+    r"^\s*(\d+)\.\s*(BUY|SELL)\s+(\d{1,4})(?:\s*[-–]\s*(\d{1,4}))?\s*(✅|❌)?\s*(ZERO|MID|LAST)\s*-\s*(TP|SL)",
     re.I | re.M,
 )
 ```
-Tanggal header format `DD-MM-YYYY`.
+Variasi yang didukung: tanggal `D-M-YYYY` atau `DD-MM-YYYY`, hari `Jum'at`, titik dua di akhir header,
+`ZERO - TP` / `ZERO -TP`, dan baris satu angka (`BUY 62 ✅ ZERO-TP` → `level_last` kosong).
 
 ### Field per baris
-`no`, `direction`, `level_first`, `level_last`, `win` (✅/❌), `depth` (ZERO/MID/LAST), `outcome` (TP/SL).
+`no`, `direction`, `level_first`, `level_last` (boleh kosong), `win` (✅/❌), `depth` (ZERO/MID/LAST), `outcome` (TP/SL).
+
+### Laporan bersifat kumulatif
+Admin mengirim ulang laporan hari yang sama setelah setiap sinyal selesai (mis. 20–45 pesan
+`Report` per tanggal, tiap kali bertambah satu baris). Yang dipakai: **pesan laporan terakhir per tanggal**.
 
 ### Kegunaan
 - **Bukan** sinyal penutupan — hanya rekap.
@@ -139,7 +167,23 @@ Tanggal header format `DD-MM-YYYY`.
 
 ---
 
-## 5. Pesan lain
+## 5. Pesan update singkat dari admin
+
+Ditemukan di riwayat (jumlah kira-kira), dikirim sebelum/sesudah sinyal lengkap:
+
+| Pesan | Arti (dugaan) | Jumlah |
+|---|---|---|
+| `BUY NOW` / `SELL NOW` / `GOLD BUY NOW` / `XAU SELL NOW` | aba-aba sinyal akan/baru dikirim | ~8.000 |
+| `TP`, `HIT TP`, `TP YAA`, `DONE TP` | sinyal terakhir hit TP | ~3.900 |
+| `ZERO`, `MID`, `LAST`, `MID TP`, `LAST TP`, `TP DI LAST YAA` | TP tercapai, entry dari level itu | ~2.000 |
+| `SL`, `LAST SL` | sinyal kena SL | ~540 |
+| `INSTAN`, `INSTAN TP` | langsung TP tanpa masuk zona dalam | ~340 |
+
+Belum dipakai di Tahap 1 (tetap `OTHER`). Kandidat untuk menandai sinyal selesai secara live (Tahap 3).
+
+---
+
+## 6. Pesan lain
 
 Pesan yang tidak cocok dengan pola sinyal/laporan tetap **disimpan mentah** (`messages`)
 dengan `kind = "OTHER"` agar bisa dianalisis — misalnya pengumuman, edukasi,
