@@ -191,3 +191,6 @@ Dicatat 11 Nov 2026 — **dievaluasi saat analisa hasil demo, tanpa mengubah EA*
    - H1 dan H4: **tidak konsisten** (H4 searah lebih baik di Agu–Sep, terbalik di Okt–Nov)
    Kesimpulan: tren M15 searah hanya sedikit membantu; H1/H4 tidak bisa dipakai sebagai aturan fast/tunggu.
    Bisa dikombinasikan dengan filter FVG M5 (no. 1) saat evaluasi demo.
+7. **Perbedaan feed harga** (SELL 51-55, 11 Nov 2026): di Exness harga tertinggi 4054.36 (18:07 WIB), LAST 4055
+   tidak tersentuh, padahal di chart user (feed lain) tampak sampai LAST. Feed bisa beda $0,3–0,6.
+   Bila memakai limit di LAST/MID, pasang sedikit sebelum level (mis. −5 pips) agar tidak meleset.
