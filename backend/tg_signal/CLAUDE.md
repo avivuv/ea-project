@@ -35,7 +35,10 @@ $py = "C:\laragon\bin\python\python-3.10\python.exe"
 & $py -m tg_signal.tg_client --dump-history    # Tahap 1: riwayat → SQLite
 & $py -m tg_signal.ingest --stats              # hasil parse + kandidat gagal
 & $py -m tg_signal.tg_client --listen          # pesan baru real-time (log saja)
-# Tahap 2+: backtest_tg, run_live (belum dibuat)
+& $py -m tg_signal.backtest_tg               # backtest (lihat docs/scalping/BACKTEST_2026-11.md)
+& $py -m tg_signal.executor --check         # cek akun demo, Algo Trading, harga
+& $py -m tg_signal.run_live --mode DEMO     # live: entry market di akun demo
+& $py -m tg_signal.dashboard               # monitoring http://127.0.0.1:8080
 ```
 
 ## Env (`backend/.env`)

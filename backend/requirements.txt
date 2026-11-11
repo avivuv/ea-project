@@ -4,3 +4,4 @@ python-dotenv==1.0.1
 telethon==1.45.0
 MetaTrader5==5.0.5370
 pytest==9.2.0
+nicegui==3.19.0
