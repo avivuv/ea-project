@@ -70,3 +70,26 @@ Aturan entry yang disebut admin secara eksplisit (topik Edukasi):
 - Sinyal ambigu: ikuti notifikasi pertama. "Tidak semua sinyal harus diikuti" (ada diskresi).
 Kandidat uji berikutnya: strategi **candle terjepit + konfirmasi M1 (rejection 61,8% / engulfing / OBIM)**,
 dan filter sinyal grup memakai rejection 61,8% (sebelumnya diuji dengan 50%).
+
+## Swing / trend-following H1–D1 (`swing.py`, `seasonality.py`) — 12 Nov 2026
+Data H1 Exness Jan 2014 – Nov 2026 (13 tahun). Latih 2014–2019, uji 2020–2026. Hasil dalam R, spread bar
+(min 2 pips) + slip 0,5 pip/sisi, SL & TP di bar sama = SL, 1 posisi per metode, **swap belum dihitung**.
+77 variasi: Donchian breakout D1/H4 (n20/55), pullback RSI di tren EMA50/200, NR7 breakout, EMA cross;
+exit 2R/3R/trailing chandelier 3–4 ATR; filter tren D1 (close vs EMA200 D1).
+
+- XAUUSD: **32/32 variasi Donchian positif** (tidak sensitif parameter). Uji entry acak (arah & jumlah
+  sama, 200×): Donchian di persentil 96–100 → timing breakout memberi edge, bukan sekadar ikut tren naik emas.
+  | Variasi XAUUSD | n | WR | avgR | latih/uji avgR | long/short R | tahun+ | DD | hold |
+  |---|---|---|---|---|---|---|---|---|
+  | Donchian D1 n20, SL 2ATR, trail 3ATR, filter D1 | 102 | 48% | +0,45 | +0,35 / +0,54 | +40 / +6 | 12/13 | 8,8R | 14 hr |
+  | Donchian D1 n55, trail 3ATR, filter D1 | 68 | 53% | +0,64 | +0,30 / +0,92 | +42 / +1 | 10/13 | 4,7R | 16 hr |
+  | Donchian H4 n55, trail 4ATR, filter D1 | 248 | 33% | +0,29 | +0,26 / +0,31 | +68 / +3 | 9/13 | 19,4R | 4 hr |
+  | Donchian H4 n20, TP 2R, tanpa filter | 749 | 38% | +0,13 | +0,13 / +0,13 | +94 / +2 | 8/13 | 18,4R | 3 hr |
+- Pola jam/hari (seasonality): jendela jam terbaik di latih gagal di uji setelah biaya → **tidak dipakai**.
+- Pair lain, aturan sama tanpa setel ulang (avgR): Donchian H4 n55 trail4 filter D1 → XAG +0,04 · EURUSD −0,06 ·
+  USDJPY +0,09 · US500 (sejak 2022) +0,06 · BTC +0,13. Emas jauh paling kuat; perak & EURUSD lemah.
+- Portofolio (risiko 0,5%/trade, tanpa compounding):
+  emas 2 metode (D1 n20 + H4 n55) = +4,5%/thn, 10/13 tahun, DD 13% ·
+  + BTC H4 n55 = +5,9%/thn, 9/13, DD 11% · + USDJPY + BTC = +6,7%/thn, 10/13, DD 15%.
+- Catatan: edge emas sebagian besar dari sisi long (short ≈ impas). Hold D1 ±2 minggu → swap bisa
+  signifikan bila akun tidak swap-free. Kandidat demo: Donchian D1 n20 trail3 filter D1 + H4 n55 trail4 filter D1 di XAUUSD.
