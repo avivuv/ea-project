@@ -68,7 +68,10 @@ TG_DUPLICATE_WINDOW_SEC = _i("TG_DUPLICATE_WINDOW_SEC", 300)
 TG_POLL_SEC = _f("TG_POLL_SEC", 3)          # cek aktif pesan baru (push Telegram bisa telat ±60 dtk)
 
 # ── Eksekusi (Tahap 4, akun demo) ───────────────────────────────────────────
-TG_ENTRY_MODE = os.getenv("TG_ENTRY_MODE", "MARKET")    # entry market saat sinyal diterima
+# ZONE (keputusan user 12 Nov 2026): sudah di zona → market, belum → pending limit di ZERO,
+#      SL = LAST ∓ TG_SL_PIPS. MARKET: entry market saat sinyal diterima, SL dari TG_SL_FROM.
+#      12 Nov 2026 (malam): user minta kembali ke MARKET sebagai default.
+TG_ENTRY_MODE = os.getenv("TG_ENTRY_MODE", "MARKET").upper()
 TG_TP_PIPS = _f("TG_TP_PIPS", 30)                       # TP = SL = 30 pips (keputusan user)
 TG_SL_FROM = os.getenv("TG_SL_FROM", "entry")           # entry | zone (LAST − SL)
 TG_MAGIC = _i("TG_MAGIC", 990011)                       # penanda order milik program ini
@@ -80,6 +83,7 @@ TG_LOT = _f("TG_LOT", 0.01)
 TG_MAX_POSITIONS = _i("TG_MAX_POSITIONS", 1)
 TG_MAX_TRADES_DAY = _i("TG_MAX_TRADES_DAY", 40)
 TG_DAILY_LOSS_USD = _f("TG_DAILY_LOSS_USD", 30.0)
+TG_DAILY_PROFIT_USD = _f("TG_DAILY_PROFIT_USD", 100.0) # tertutup+floating >= ini → tutup semua & stop; 0 = off (dibuat tinggi: BT $10 tidak membantu)
 TG_MAX_SPREAD_PIPS = _f("TG_MAX_SPREAD_PIPS", 5)
 TG_DAY_TZ_HOURS = 7                                     # hari trading dihitung WIB
 

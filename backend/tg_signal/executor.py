@@ -129,9 +129,95 @@ class MT5Executor:
                     sl=p.sl if p else req["sl"], tp=p.tp if p else req["tp"],
                     time=datetime.now(timezone.utc))
 
+    def open_market_at(self, direction: str, lot: float, sl: float, tp: float, comment: str) -> Fill:
+        """Order market dengan SL & TP berupa harga tetap (mode ZONE: SL dari LAST)."""
+        tk = mt5.symbol_info_tick(self.symbol)
+        d = self.info.digits
+        price, otype = (tk.ask, mt5.ORDER_TYPE_BUY) if direction == "BUY" else (tk.bid, mt5.ORDER_TYPE_SELL)
+        req = {
+            "action": mt5.TRADE_ACTION_DEAL, "symbol": self.symbol, "volume": float(lot),
+            "type": otype, "price": round(price, d), "sl": round(sl, d), "tp": round(tp, d),
+            "deviation": settings.TG_DEVIATION_POINTS, "magic": settings.TG_MAGIC,
+            "comment": comment[:31], "type_time": mt5.ORDER_TIME_GTC, "type_filling": self._filling(),
+        }
+        res = mt5.order_send(req)
+        if res is None or res.retcode != mt5.TRADE_RETCODE_DONE:
+            code = None if res is None else res.retcode
+            msg = mt5.last_error() if res is None else res.comment
+            raise RuntimeError(f"order_send gagal (retcode={code}): {msg}")
+        p = self.position_of(res.order)
+        return Fill(ticket=res.order, price=p.price_open if p else res.price,
+                    sl=p.sl if p else req["sl"], tp=p.tp if p else req["tp"],
+                    time=datetime.now(timezone.utc))
+
+    def place_limit(self, direction: str, lot: float, price: float, sl: float, tp: float,
+                    comment: str) -> int:
+        """Pending BUY LIMIT / SELL LIMIT dengan SL & TP. Return ticket order."""
+        d = self.info.digits
+        otype = mt5.ORDER_TYPE_BUY_LIMIT if direction == "BUY" else mt5.ORDER_TYPE_SELL_LIMIT
+        req = {
+            "action": mt5.TRADE_ACTION_PENDING, "symbol": self.symbol, "volume": float(lot),
+            "type": otype, "price": round(price, d), "sl": round(sl, d), "tp": round(tp, d),
+            "magic": settings.TG_MAGIC, "comment": comment[:31], "type_time": mt5.ORDER_TIME_GTC,
+        }
+        res = None
+        for filling in (mt5.ORDER_FILLING_RETURN, self._filling()):   # broker beda-beda untuk pending
+            res = mt5.order_send({**req, "type_filling": filling})
+            if res is not None and res.retcode != mt5.TRADE_RETCODE_INVALID_FILL:
+                break
+        if res is None or res.retcode not in (mt5.TRADE_RETCODE_DONE, mt5.TRADE_RETCODE_PLACED):
+            code = None if res is None else res.retcode
+            msg = mt5.last_error() if res is None else res.comment
+            raise RuntimeError(f"pending gagal (retcode={code}): {msg}")
+        return res.order
+
+    def cancel_order(self, ticket: int) -> bool:
+        res = mt5.order_send({"action": mt5.TRADE_ACTION_REMOVE, "order": int(ticket)})
+        return res is not None and res.retcode == mt5.TRADE_RETCODE_DONE
+
+    def pending_tickets(self) -> set[int]:
+        orders = mt5.orders_get(symbol=self.symbol) or ()
+        return {o.ticket for o in orders if o.magic == settings.TG_MAGIC}
+
+    def position_of(self, order_ticket: int):
+        """Posisi yang dibuka oleh order ini (ticket posisi = ticket order pembuka), atau None."""
+        for p in mt5.positions_get(symbol=self.symbol) or ():
+            if p.ticket == order_ticket or p.identifier == order_ticket:
+                return p
+        return None
+
+    def entry_deal(self, order_ticket: int):
+        """Deal pembuka posisi dari order ini (untuk posisi yang sudah tutup lagi), atau None."""
+        deals = mt5.history_deals_get(position=order_ticket) or ()
+        ins = [d for d in deals if d.entry == mt5.DEAL_ENTRY_IN]
+        return ins[0] if ins else None
+
     def open_tickets(self) -> set[int]:
         pos = mt5.positions_get(symbol=self.symbol) or ()
         return {p.ticket for p in pos if p.magic == settings.TG_MAGIC}
+
+    def floating_usd(self) -> float:
+        """Profit mengambang (profit + swap) semua posisi milik program ini."""
+        pos = mt5.positions_get(symbol=self.symbol) or ()
+        return round(sum(p.profit + p.swap for p in pos if p.magic == settings.TG_MAGIC), 2)
+
+    def close_position(self, ticket: int, comment: str = "target harian") -> bool:
+        """Tutup posisi dengan order market berlawanan. True bila berhasil / sudah tidak ada."""
+        pos = mt5.positions_get(ticket=int(ticket))
+        if not pos:
+            return True
+        p = pos[0]
+        tk = mt5.symbol_info_tick(self.symbol)
+        buy = p.type == mt5.POSITION_TYPE_BUY
+        req = {
+            "action": mt5.TRADE_ACTION_DEAL, "symbol": self.symbol, "volume": p.volume, "position": p.ticket,
+            "type": mt5.ORDER_TYPE_SELL if buy else mt5.ORDER_TYPE_BUY,
+            "price": tk.bid if buy else tk.ask, "deviation": settings.TG_DEVIATION_POINTS,
+            "magic": settings.TG_MAGIC, "comment": comment[:31], "type_time": mt5.ORDER_TIME_GTC,
+            "type_filling": self._filling(),
+        }
+        res = mt5.order_send(req)
+        return res is not None and res.retcode == mt5.TRADE_RETCODE_DONE
 
     def closed_info(self, ticket: int) -> Closed | None:
         deals = mt5.history_deals_get(position=ticket) or ()

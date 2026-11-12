@@ -142,6 +142,7 @@ Tahap 3 ditahan sampai ada keputusan arah (lihat BACKTEST_2026-11.md).
 | D6 | Konfirmasi | FVG **atau** OB; bila lemah wajib keduanya (OBIM) |
 | D7 | Sumber | Grup Telegram dosen, dibaca via Telethon (akun user member) |
 | D8 | Masa berlaku sinyal | Valid sampai sinyal hit TP/SL (dari zona); setelah itu tidak dipakai lagi. Tanpa timeout waktu, tanpa re-entry |
+| D9 | Entry live (12 Nov 2026) | `TG_ENTRY_MODE=ZONE`: ikuti harga sinyal. Saat sinyal datang harga sudah di zona → market; belum → pending limit di ZERO. SL = LAST ∓ 30 pips, TP = entry ± 30 pips. Pending hangus bila harga sampai ZERO ± 30 pips tanpa fill; sinyal baru menggantikan pending lama. Dipilih user walau backtest no. 11 lebih buruk dari market — dievaluasi di demo |
 
 ### Masih terbuka (diputuskan setelah Tahap 2)
 | # | Topik | Opsi |
@@ -200,3 +201,25 @@ Dicatat 11 Nov 2026 — **dievaluasi saat analisa hasil demo, tanpa mengubah EA*
    −1,43 s/d −1,56 → selisih antar aturan hanya noise. **TP dinamis berdasarkan tren tidak membantu**;
    besar TP (10–30) sendiri hampir tidak mengubah hasil. Yang lebih berpengaruh: sinyal mana yang diambil
    (filter FVG M5, no. 1) dan posisi SL (no. 5).
+9. **Entry MID/LAST menurut volatilitas atau saat lawan tren** (ide user, diuji 12 Nov 2026; M1 Agu–Nov, TP/SL 30).
+   Limit MID ter-fill 26–36%, LAST 14–20%; ±80% sinyal yang tak sampai LAST justru TP dari ZERO. Trade yang
+   ter-fill di LAST rugi lebih besar per trade (seleksi buruk: harga sampai LAST karena ditembus kuat).
+   "ATR14 M1 tinggi → LAST": −1,77 | −1,53 vs market −2,16 | −1,11 (lebih buruk di periode uji).
+   "BUY saat tren turun → MID/LAST": tidak konsisten di M15/H1/H4. **Tidak dipakai.**
+10. **Pencarian filter sinyal** (12 Nov 2026; entry market, SL 30, max 1 posisi). Grid 2.659 kombinasi
+    (sesi × tren M15/H1 × momentum 3 candle M5 × FVG M5 / blocker M1 × stop harian 2–3 SL × TP 15/20/30) di M1
+    Agu–Nov: 6,8% positif di kedua paruh vs 4,3% untuk filter acak → sebagian besar kebetulan. Kandidat terbaik
+    diuji di data baru Okt 2025–Jul 2026 (bar M5; simulasi M5 ±2,3 pips/trade lebih buruk dari M1 sebagai
+    kalibrasi). Avg pips/trade (M1 Agu–Nov | M5 Agu–Nov | M5 Okt25–Jul, bulan positif):
+    baseline −1,62 | −3,97 | −3,54 (1/13) · **pullback ≥2 candle M5 + FVG M5 searah** +1,34 | −1,15 | −2,45 (3/12) ·
+    + jam 14–21 WIB +3,38 | +0,57 | −3,89 · jam 19–21 + H1 searah + FVG M5 +9,07 | −1,43 | −3,06 ·
+    jam 14–18 + close M5 bukan di ujung lawan + stop 2 SL +1,59 | −0,11 | −2,44 · FVG M5 saja +0,25 | −1,53 | −3,24.
+    Kesimpulan: filter jam tidak bertahan. "Pullback + FVG M5" dan "close bukan di ujung lawan" konsisten
+    memperbaiki ±1 pip/trade dibanding baseline di kedua data, tapi setelah kalibrasi hanya ≈ impas — **belum ada
+    filter yang profit konsisten**. Script uji: scratchpad sesi (filter_search.py, filter_eval.py, oos_eval.py).
+11. **Limit di ZERO + SL di bawah LAST vs market** (diuji 12 Nov 2026; M1 31 Jul–12 Nov, 2.468 sinyal,
+    split 21 Sep). Avg pips/trade ALL | paruh 1 | paruh 2, TP30: MARKET SLentry −1,69 | −1,87 | −1,51 ·
+    LIMIT_ZERO SLzone −3,37 | −3,36 | −3,37 · LIMIT_ZERO SLentry −2,87 · MARKET SLzone −2,58. TP20 sama polanya.
+    ZERO hampir selalu tersentuh (hanya 23 tidak), jadi limit tidak menyaring sinyal, hanya mengubah harga entry
+    dan memperlebar risiko. **Market entry + SL 30 dari entry tetap yang terbaik (walau tetap negatif).**
+    User tetap memilih entry sesuai zona sinyal (D9) untuk dievaluasi di demo.

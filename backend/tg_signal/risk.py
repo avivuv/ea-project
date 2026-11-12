@@ -23,7 +23,13 @@ class RiskLimits:
     max_positions: int
     max_trades_day: int
     daily_loss_usd: float
+    daily_profit_usd: float = 0.0           # target profit harian; 0 = nonaktif
     max_price_age_sec: float = 10.0
+
+
+def target_hit(realized_usd: float, floating_usd: float, target_usd: float) -> bool:
+    """Target profit harian tercapai (profit tertutup + mengambang). target 0 = nonaktif."""
+    return target_usd > 0 and realized_usd + floating_usd >= target_usd
 
 
 def check(direction: str, zone_zero: float, zone_distance: float,
@@ -39,6 +45,8 @@ def check(direction: str, zone_zero: float, zone_distance: float,
         return False, "SPREAD_TOO_WIDE"
     if st.pnl_today_usd <= -lim.daily_loss_usd:
         return False, "DAILY_LOSS_LIMIT"
+    if lim.daily_profit_usd > 0 and st.pnl_today_usd >= lim.daily_profit_usd:
+        return False, "DAILY_PROFIT_TARGET"
     if st.trades_today >= lim.max_trades_day:
         return False, "MAX_TRADES_DAY"
     if len(st.open_positions) >= lim.max_positions:

@@ -82,6 +82,51 @@ def mt5_snapshot() -> dict:
         return {}
 
 
+SWING_METHODS = [  # sama dengan intraday.swing_live.METHODS (tidak di-import agar dashboard ringan)
+    ("XAU_D1_DON20", "XAUUSD", "Donchian D1 20 · trail 3 ATR", 26111201),
+    ("XAU_H4_DON55", "XAUUSD", "Donchian H4 55 · trail 4 ATR", 26111202),
+    ("BTC_H4_DON55", "BTCUSD", "Donchian H4 55 · trail 4 ATR", 26111203),
+    ("JPY_H4_DON55", "USDJPY", "Donchian H4 55 · trail 4 ATR", 26111204),
+]
+
+
+def swing_snapshot() -> dict:
+    """Posisi & deal tutup EA swing (dibedakan lewat magic). Gagal → dict kosong."""
+    try:
+        import MetaTrader5 as mt5
+        if not mt5.initialize():
+            return {}
+        magics = {m[3]: m for m in SWING_METHODS}
+        pos = {}
+        for p in mt5.positions_get() or ():
+            if p.magic in magics:
+                pos[p.magic] = {"ticket": p.ticket, "dir": "BUY" if p.type == 0 else "SELL", "lot": p.volume,
+                                "entry": p.price_open, "sl": p.sl, "price": p.price_current,
+                                "profit": p.profit + p.swap, "time": datetime.fromtimestamp(p.time, timezone.utc)}
+        now = datetime.now(timezone.utc)
+        deals = [d for d in (mt5.history_deals_get(now - timedelta(days=365), now + timedelta(days=1)) or ())
+                 if d.magic in magics and d.entry == mt5.DEAL_ENTRY_OUT]
+        closed = [{"time": datetime.fromtimestamp(d.time, timezone.utc), "id": magics[d.magic][0],
+                   "symbol": d.symbol, "usd": d.profit + d.swap + d.commission} for d in deals]
+        return {"pos": pos, "closed": sorted(closed, key=lambda x: x["time"])}
+    except Exception:
+        return {}
+
+
+def file_status(log_name: str, hb_name: str) -> tuple[str, str]:
+    log = settings.DATA_DIR / log_name
+    if not log.exists():
+        return "BELUM PERNAH JALAN", "bad"
+    age = datetime.now().timestamp() - log.stat().st_mtime
+    hb = settings.DATA_DIR / hb_name
+    if hb.exists():
+        age = min(age, datetime.now().timestamp() - hb.stat().st_mtime)
+    if age < 90:
+        return "AKTIF", "good"
+    mins = int(age // 60)
+    return (f"tidak ada aktivitas {mins} menit", "warn") if age < 3600 else ("MATI / DIAM", "bad")
+
+
 def program_status() -> tuple[str, str]:
     """(teks, kelas warna) dari umur baris terakhir live.log."""
     log = settings.DATA_DIR / "live.log"
@@ -111,7 +156,7 @@ def build() -> None:
     ui.dark_mode(True)
     with ui.row().classes("w-full items-center justify-between"):
         with ui.column().classes("gap-0"):
-            ui.label("Telegram Scalper — XAUUSD").classes("text-xl font-semibold")
+            ui.label("Scalping sinyal Telegram — XAUUSD").classes("text-xl font-semibold")
             info = ui.label("").classes("sub")
         with ui.row().classes("items-center gap-3"):
             prog = ui.label("").classes("font-semibold")
@@ -178,6 +223,87 @@ def build() -> None:
             ui.label("Log program").classes("label")
             logbox = ui.label("").classes("logbox")
 
+    # ── Swing ───────────────────────────────────────────────────────────────
+    swing_pause = settings.DATA_DIR / "PAUSE_SWING"
+    with ui.row().classes("w-full items-center justify-between mt-4"):
+        with ui.column().classes("gap-0"):
+            ui.label("Swing trend-following — XAUUSD · BTCUSD · USDJPY").classes("text-xl font-semibold")
+            ui.label("Donchian breakout + filter tren D1 · tanpa TP, trailing ATR · risiko 0,5%/trade "
+                     "(skip bila lot minimum > 2% saldo) · 1 posisi per metode").classes("sub")
+        with ui.row().classes("items-center gap-3"):
+            sw_prog = ui.label("").classes("font-semibold")
+            sw_btn = ui.button("").props("unelevated")
+    with ui.grid(columns="repeat(auto-fit, minmax(240px, 1fr))").classes("w-full gap-3"):
+        sw_cards = {}
+        for mid, sym, desc, _ in SWING_METHODS:
+            with ui.element("div").classes("card"):
+                ui.label(f"{sym} · {mid}").classes("label")
+                ui.label(desc).classes("sub")
+                v = ui.label("-").classes("value num")
+                s = ui.label("").classes("sub num")
+                sw_cards[mid] = (v, s)
+    with ui.row().classes("w-full gap-3 items-start no-wrap max-md:flex-wrap"):
+        with ui.element("div").classes("card flex-1 min-w-[320px]"):
+            sw_sum = ui.label("Trade swing tutup").classes("label")
+            sw_table = ui.table(columns=[
+                {"name": "tutup", "label": "Tutup", "field": "tutup", "align": "left"},
+                {"name": "metode", "label": "Metode", "field": "metode", "align": "left"},
+                {"name": "usd", "label": "USD", "field": "usd", "align": "right"},
+            ], rows=[], row_key="k", pagination=8).classes("w-full").props("dense flat dark")
+        with ui.element("div").classes("card flex-1 min-w-[320px]"):
+            ui.label("Log swing").classes("label")
+            sw_log = ui.label("").classes("logbox")
+
+    def toggle_swing() -> None:
+        if swing_pause.exists():
+            swing_pause.unlink(); ui.notify("Swing resume: entry baru diizinkan")
+        else:
+            swing_pause.write_text("pause dari dashboard"); ui.notify("Swing pause: tanpa entry baru (trailing tetap jalan)")
+        refresh()
+
+    def confirm_swing() -> None:
+        with ui.dialog() as dlg, ui.card():
+            ui.label("Lanjutkan entry swing?" if swing_pause.exists()
+                     else "Hentikan entry swing baru? Posisi terbuka & trailing tetap berjalan.")
+            with ui.row():
+                ui.button("Ya", on_click=lambda: (dlg.close(), toggle_swing()))
+                ui.button("Batal", on_click=dlg.close).props("flat")
+        dlg.open()
+
+    sw_btn.on_click(confirm_swing)
+
+    def refresh_swing() -> None:
+        txt, cls = file_status("swing_live.log", "swing_heartbeat")
+        paused = swing_pause.exists()
+        sw_prog.text = f"● Swing: {txt}" + (" · PAUSE" if paused else "")
+        sw_prog.classes(replace=f"font-semibold {('warn' if paused else cls)}")
+        sw_btn.text = "Resume swing" if paused else "Pause swing"
+        snap = swing_snapshot()
+        closed = snap.get("closed", [])
+        for mid, sym, _, magic in SWING_METHODS:
+            v, s = sw_cards[mid]
+            p = snap.get("pos", {}).get(magic)
+            tot = sum(c["usd"] for c in closed if c["id"] == mid)
+            n = sum(1 for c in closed if c["id"] == mid)
+            if p:
+                v.text = f"{p['profit']:+.2f} USD"
+                v.classes(replace="value num " + ("good" if p["profit"] > 0 else "bad" if p["profit"] < 0 else ""))
+                s.text = (f"{p['dir']} {p['lot']} @ {p['entry']:g} · SL {p['sl']:g} · sejak "
+                          f"{(p['time'] + WIB):%d/%m %H:%M} WIB · tutup: {n} trade {tot:+.2f}")
+            else:
+                v.text = "tanpa posisi"
+                v.classes(replace="value num")
+                s.text = f"menunggu breakout · tutup: {n} trade {tot:+.2f} USD"
+        total = sum(c["usd"] for c in closed)
+        sw_sum.text = f"Trade swing tutup · {len(closed)} trade · total {total:+.2f} USD"
+        sw_table.rows = [{"k": i, "tutup": (c["time"] + WIB).strftime("%d/%m %H:%M"), "metode": c["id"],
+                          "usd": f"{c['usd']:+.2f}"} for i, c in enumerate(reversed(closed))]
+        sw_table.update()
+        log = settings.DATA_DIR / "swing_live.log"
+        if log.exists():
+            lines = log.read_text(encoding="utf-8", errors="replace").splitlines()[-40:]
+            sw_log.text = "\n".join(l[5:] for l in reversed(lines))
+
     def toggle_pause() -> None:
         if settings.PAUSE_FILE.exists():
             settings.PAUSE_FILE.unlink()
@@ -223,7 +349,10 @@ def build() -> None:
                                  WHERE mode='DEMO' AND open_utc >= ?""", (start,)).fetchone()
             v_pnl.text = f"{day['pnl']:+.2f} USD"
             v_pnl.classes(replace="value num " + ("good" if day["pnl"] > 0 else "bad" if day["pnl"] < 0 else ""))
-            s_pnl.text = f"batas rugi harian ${settings.TG_DAILY_LOSS_USD:g}"
+            hit = settings.TG_DAILY_PROFIT_USD > 0 and day["pnl"] >= settings.TG_DAILY_PROFIT_USD
+            s_pnl.text = (f"batas rugi harian ${settings.TG_DAILY_LOSS_USD:g}"
+                          + (f" · target ${settings.TG_DAILY_PROFIT_USD:g}" if settings.TG_DAILY_PROFIT_USD > 0 else "")
+                          + (" · ✋ target tercapai, stop" if hit else ""))
             v_tr.text = f"{day['n']}"
             s_tr.text = f"✓ TP {day['tp'] or 0} · ✕ SL {day['sl'] or 0} · maks {settings.TG_MAX_TRADES_DAY}/hari"
             allr = con.execute("""SELECT COUNT(*) n, SUM(profit_usd > 0) w, COALESCE(SUM(profit_usd),0) p
@@ -246,7 +375,8 @@ def build() -> None:
                 "id": r["id"], "jam": wib(r["received_utc"]),
                 "sinyal": f"{r['direction']} {r['level_first']:02d}-{r['level_last']:02d}",
                 "zona": f"{r['zero']:.0f} / {r['last']:.0f}" if r["zero"] else "-",
-                "status": {"OPEN": "● OPEN", "CLOSED": "✓ CLOSED", "REJECTED": "✕ DITOLAK"}.get(r["status"], r["status"]),
+                "status": {"OPEN": "● OPEN", "PENDING": "◷ PENDING", "CLOSED": "✓ CLOSED", "REJECTED": "✕ DITOLAK",
+                           "EXPIRED": "⌛ HANGUS", "CANCELLED": "⊘ BATAL"}.get(r["status"], r["status"]),
                 "alasan": r["status_reason"],
             } for r in con.execute("""SELECT * FROM signals WHERE received_utc >= ?
                                       ORDER BY received_utc DESC""", (start,)).fetchall()]
@@ -282,6 +412,7 @@ def build() -> None:
         if log.exists():
             lines = log.read_text(encoding="utf-8", errors="replace").splitlines()[-40:]
             logbox.text = "\n".join(l[11:] for l in reversed(lines))
+        refresh_swing()
 
     refresh()
     ui.timer(REFRESH_SEC, refresh)

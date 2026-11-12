@@ -63,6 +63,7 @@ Setiap transisi **dicatat** di SQLite dengan timestamp dan alasan.
 | Max posisi bersamaan | `TG_MAX_POSITIONS` = 1 |
 | Max trade per hari | `TG_MAX_TRADES_DAY` = 10 |
 | Daily loss limit | `TG_DAILY_LOSS_USD` (mis. $10 untuk lot 0.01) → pause sampai hari berikut |
+| Daily profit target | `TG_DAILY_PROFIT_USD` (default $100 — praktis jaring pengaman saja; 0 = off; backtest Agu–Nov 2026: target $10 malah −$416 vs −$381 tanpa target) → profit tertutup + floating hari ini ≥ target → semua posisi ditutup market (outcome `TARGET`), pending dibatalkan, stop buka order sampai hari berikut (WIB) |
 | Max spread | `TG_MAX_SPREAD_PIPS` = 5 → skip entry |
 | Duplikat zona | sinyal baru dengan arah sama & zona overlap posisi terbuka → REJECTED |
 | News | pause ±`TG_NEWS_PAUSE_MIN` menit di sekitar high-impact USD (`detectors/news_calendar.py`) |
