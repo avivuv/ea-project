@@ -190,6 +190,24 @@ class MT5Executor:
             raise RuntimeError(f"pending gagal (retcode={code}): {msg}")
         return res.order
 
+    def common_files_dir(self):
+        """Folder Common\\Files MT5 (dibaca indikator dengan FILE_COMMON)."""
+        from pathlib import Path
+        p = Path(mt5.terminal_info().commondata_path) / "Files"
+        p.mkdir(parents=True, exist_ok=True)
+        return p
+
+    def modify_tp(self, ticket: int, tp: float) -> bool:
+        """Ubah TP posisi (SL tetap). True bila berhasil."""
+        pos = mt5.positions_get(ticket=int(ticket))
+        if not pos:
+            return False
+        p = pos[0]
+        d = self.info.digits
+        res = mt5.order_send({"action": mt5.TRADE_ACTION_SLTP, "symbol": self.symbol, "position": p.ticket,
+                              "sl": p.sl, "tp": round(tp, d), "magic": self.magic})
+        return res is not None and res.retcode == mt5.TRADE_RETCODE_DONE
+
     def cancel_order(self, ticket: int) -> bool:
         res = mt5.order_send({"action": mt5.TRADE_ACTION_REMOVE, "order": int(ticket)})
         return res is not None and res.retcode == mt5.TRADE_RETCODE_DONE

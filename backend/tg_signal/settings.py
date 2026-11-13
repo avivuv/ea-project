@@ -80,6 +80,13 @@ TG_POI_BARS = _i("TG_POI_BARS", 300)                           # jumlah bar yang
 TG_POI_MAX_AGE = _i("TG_POI_MAX_AGE", 240)                     # umur maks POI (bar)
 TG_POI_TOL = _f("TG_POI_TOL", 0.5)                             # zona diperlebar $ ini saat cari POI
 TG_POI_MIN_SIZE = _f("TG_POI_MIN_SIZE", 0.2)                   # ukuran minimum FVG/OB ($)
+# Tanpa POI di zona: NONE = sinyal WAITING, dicek ulang tiap bar sampai POI terbentuk / sinyal selesai
+# (keputusan user 13 Nov 2026: sedikit order tapi presisi) | ZERO = pending di ZERO seperti mode ZONE
+TG_POI_FALLBACK = os.getenv("TG_POI_FALLBACK", "NONE").upper()
+# Admin sudah "tp" (harga sampai ZERO ± TG_EXPIRE_TP_PIPS) tapi posisi kita belum TP → TP diturunkan ke
+# entry ± ini (harga sudah lewat → tutup). Keputusan user 13 Nov 2026; backtest admin_tp_study.py:
+# rugi berkurang ~30–50% di dua periode. 0 = off.
+TG_ADMIN_TP_PIPS = _f("TG_ADMIN_TP_PIPS", 20)
 TG_TP_PIPS = _f("TG_TP_PIPS", 30)                       # TP = SL = 30 pips (keputusan user)
 TG_SL_FROM = os.getenv("TG_SL_FROM", "entry")           # entry | zone (LAST − SL)
 TG_MAGIC = _i("TG_MAGIC", 990011)                       # penanda order milik program ini

@@ -87,10 +87,12 @@ class ProTrader:
 
         self.sync(df, in_news)
         mk = ps.Market(df, EMA_SPAN, BIAS_TF, MIN_SLOPE)
+        finals = {}
         for is_buy in (True, False):
             d = "BUY" if is_buy else "SELL"
             final: dict = {}
             ps.run_side(mk, CFG, is_buy, block, final)
+            finals[is_buy] = final
             st, s, last_i = final["state"], final["s"], final["last_i"]
             if st == "armed" and s["arm_i"] == last_i:
                 p = s["poi"]
@@ -102,6 +104,42 @@ class ProTrader:
                 continue
             self.maybe_order(d, is_buy, mk, st, s, last_i, in_news, tick)
         self.save()
+        try:
+            self.export_markers(mk, finals, tick)
+        except Exception:
+            log.exception("gagal menulis marker POI")
+
+    def export_markers(self, mk: ps.Market, finals: dict, tick) -> None:
+        """Tulis POI M15 aktif, POI armed, dan order ke Common\\Files\\pro_poi.csv untuk indikator ProPOI (MT5).
+        Format per baris (8 kolom): rec,dir,kind,t1(epoch jam server),p1,p2,p3,flag."""
+        i = mk.n - 2                                    # bar M5 terakhir yang sudah close
+        off = int(settings.MT5_UTC_OFFSET_H * 3600)
+        epoch = lambda k: int(mk.t[k].astype("datetime64[s]").astype(np.int64)) + off
+        px = tick.bid
+        rows = [f"HDR,,,{int(time.time()) + off},0,0,0,0"]
+        for is_buy in (True, False):
+            d, sg = ("BUY", 1) if is_buy else ("SELL", -1)
+            bias = int(bool(mk.bias[("ema", is_buy)][i]))
+            for created, dead, top, bottom, kind in mk.pois[is_buy]:
+                if not (created < i <= dead and i - created <= ps.POI_AGE):
+                    continue
+                lo, hi = sorted((sg * top, sg * bottom))
+                if abs((lo + hi) / 2 - px) > 25:        # cukup yang dekat harga
+                    continue
+                rows.append(f"POI,{d},{kind},{epoch(created)},{lo:.2f},{hi:.2f},0,{bias}")
+            f = finals.get(is_buy, {})
+            if f.get("state") == "armed":
+                p = f["s"]["poi"]
+                lo, hi = sorted((sg * p[2], sg * p[3]))
+                rows.append(f"ARMED,{d},{p[4]},{epoch(f['s']['arm_i'])},{lo:.2f},{hi:.2f},0,1")
+            rec = self.state["live"].get(d)
+            if rec:
+                t = int(pd.Timestamp(rec["placed"]).timestamp()) + off
+                rows.append(f"ORDER,{d},{rec['kind']},{t},{rec['price']:.2f},{rec['sl']:.2f},{rec['tp']:.2f},1")
+        path = self.ex.common_files_dir() / "pro_poi.csv"
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text("\n".join(rows) + "\n", encoding="ascii")
+        tmp.replace(path)
 
     def maybe_order(self, d, is_buy, mk, st, s, last_i, in_news, tick) -> None:
         sg = 1 if is_buy else -1

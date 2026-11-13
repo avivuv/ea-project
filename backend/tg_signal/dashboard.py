@@ -499,7 +499,7 @@ def build() -> None:
                 "id": r["id"], "jam": wib(r["received_utc"]),
                 "sinyal": f"{r['direction']} {r['level_first']:02d}-{r['level_last']:02d}",
                 "zona": f"{r['zero']:.0f} / {r['last']:.0f}" if r["zero"] else "-",
-                "status": {"OPEN": "● OPEN", "PENDING": "◷ PENDING", "CLOSED": "✓ CLOSED", "REJECTED": "✕ DITOLAK",
+                "status": {"OPEN": "● OPEN", "PENDING": "◷ PENDING", "WAITING": "◌ TUNGGU POI", "CLOSED": "✓ CLOSED", "REJECTED": "✕ DITOLAK",
                            "EXPIRED": "⌛ HANGUS", "CANCELLED": "⊘ BATAL"}.get(r["status"], r["status"]),
                 "alasan": r["status_reason"],
             } for r in con.execute("""SELECT * FROM signals WHERE received_utc >= ?
@@ -510,7 +510,7 @@ def build() -> None:
                 "id": r["id"], "buka": (datetime.fromisoformat(r["open_utc"]) + WIB).strftime("%d/%m %H:%M"),
                 "arah": r["direction"], "entry": f"{r['entry']:.2f}",
                 "exit": f"{r['exit']:.2f}" if r["exit"] else "-",
-                "hasil": {"TP": "✓ TP", "SL": "✕ SL"}.get(r["outcome"], r["outcome"] or "● berjalan"),
+                "hasil": {"TP": "✓ TP", "SL": "✕ SL", "TP_ADMIN": "✓ TP admin"}.get(r["outcome"], r["outcome"] or "● berjalan"),
                 "pips": f"{r['pips']:+.1f}" if r["pips"] is not None else "-",
                 "usd": f"{r['profit_usd']:+.2f}" if r["profit_usd"] is not None else "-",
             } for r in con.execute("SELECT * FROM trades WHERE mode='DEMO' ORDER BY open_utc DESC LIMIT 200")]

@@ -54,6 +54,8 @@ class Cfg:
     rr: float = 2.0
     session: bool = True
     be: bool = False
+    fallback: str = "market"   # kaki CHoCH tanpa FVG M5: market | level (limit retest level CHoCH) |
+                               # half (limit 50% kaki CHoCH) | skip
 
     @property
     def name(self) -> str:
@@ -228,6 +230,18 @@ def run_side(mk: Market, cfg: Cfg, is_buy: bool, block: np.ndarray | None = None
                     else:
                         state = "idle"
                     continue
+            if cfg.fallback != "market":
+                if cfg.fallback == "skip":
+                    state = "idle"
+                    continue
+                lim = level if cfg.fallback == "level" else (s["low"] + H[lo_i:i + 1].max()) / 2
+                risk = lim - sl
+                if RISK_MIN <= risk <= RISK_MAX and n_day < MAX_TRADES_DAY and loss_day < MAX_LOSS_DAY:
+                    s.update(lim=lim, sl=sl, sl0=sl, risk=risk, tp=lim + cfg.rr * risk, pend_until=i + PEND_WAIT)
+                    state = "pending"
+                else:
+                    state = "idle"
+                continue
             entry = O[i + 1] + (spr[i + 1] if is_buy else 0.0)
             risk = entry - sl
             if RISK_MIN <= risk <= RISK_MAX and n_day < MAX_TRADES_DAY and loss_day < MAX_LOSS_DAY:

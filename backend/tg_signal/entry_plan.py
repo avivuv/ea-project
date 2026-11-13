@@ -50,13 +50,15 @@ def pending_expired(direction: str, zero: float, bid: float, ask: float, tp_dist
 
 def plan_poi(direction: str, zero: float, last: float, bid: float, ask: float,
              pois: list[tuple[float, float, str]], sl_dist: float, tp_dist: float,
-             allow_market: bool = True) -> EntryPlan:
+             allow_market: bool = True, fallback: str = "ZERO") -> EntryPlan:
     """Mode POI (TG_ENTRY_MODE=POI): pending di POI (FVG/OB/IFVG) yang ada di dalam zona sinyal.
 
     - Harga melewati LAST ∓ SL → REJECT (sinyal sudah gagal).
     - Harga sudah di zona (BUY: ask ≤ ZERO) dan allow_market → MARKET.
     - Ada POI yang tepi proximal-nya masih di bawah harga (BUY) → LIMIT di POI terdekat.
-    - Tidak ada POI → LIMIT di ZERO (sama seperti mode ZONE); bila harga sudah di bawah ZERO → NONE.
+    - Tidak ada POI → fallback="ZERO": LIMIT di ZERO (bila harga sudah di bawah ZERO → NONE);
+      fallback="NONE": NONE (tunggu POI terbentuk), termasuk saat harga sudah di zona tanpa POI.
+      Keputusan user 13 Nov 2026: NONE — sedikit order tapi presisi (backtest: sinyal tanpa POI di ZERO rugi).
     SL/TP dihitung dari harga entry (SL = entry ∓ sl_dist, TP = entry ± tp_dist).
     pois: hasil detectors.poi.zone_pois → (proximal, distal, jenis).
     """
@@ -66,12 +68,16 @@ def plan_poi(direction: str, zero: float, last: float, bid: float, ask: float,
     if g * (exit_px - (last - g * sl_dist)) <= 0:
         return EntryPlan("REJECT", reason="PAST_SL")
     if allow_market and g * (fill_px - zero) <= 0:
+        if fallback == "NONE" and not pois:
+            return EntryPlan("NONE", reason="di zona tanpa POI → tunggu POI")
         return EntryPlan("MARKET", fill_px, fill_px - g * sl_dist, fill_px + g * tp_dist, "harga sudah di zona")
     ahead = [p for p in pois if g * (fill_px - p[0]) > 0]
     if ahead:
         prox, dist, kind = max(ahead, key=lambda p: g * p[0])
         return EntryPlan("LIMIT", prox, prox - g * sl_dist, prox + g * tp_dist,
                          f"POI {kind} {min(prox, dist):.2f}-{max(prox, dist):.2f}")
+    if fallback == "NONE":
+        return EntryPlan("NONE", reason="tanpa POI → tunggu POI")
     if g * (fill_px - zero) > 0:
         return EntryPlan("LIMIT", zero, zero - g * sl_dist, zero + g * tp_dist, "tanpa POI → ZERO")
     return EntryPlan("NONE", reason="tidak ada POI di depan harga")

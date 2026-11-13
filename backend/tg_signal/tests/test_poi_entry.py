@@ -73,3 +73,25 @@ def test_zone_pois_drops_broken_poi():
     ]
     found = zone_pois("BUY", *_bars(rows), zero=3897.0, last=3893.0)
     assert not any(k in ("FVG", "OB") and prox >= 3896 for prox, _, k in found)
+
+
+def test_fallback_none_waits_without_poi():
+    p = plan_poi("BUY", 3889.0, 3885.0, bid=3890.0, ask=3890.2, pois=[], sl_dist=SL, tp_dist=TP, fallback="NONE")
+    assert p.kind == "NONE"
+
+
+def test_fallback_none_in_zone_without_poi_waits():
+    p = plan_poi("BUY", 3889.0, 3885.0, bid=3888.0, ask=3888.2, pois=[], sl_dist=SL, tp_dist=TP, fallback="NONE")
+    assert p.kind == "NONE"
+
+
+def test_fallback_none_in_zone_with_poi_is_market():
+    p = plan_poi("BUY", 3889.0, 3885.0, bid=3888.0, ask=3888.2, pois=[(3887.0, 3886.0, "FVG")],
+                 sl_dist=SL, tp_dist=TP, fallback="NONE")
+    assert p.kind == "MARKET"
+
+
+def test_fallback_none_still_limits_at_poi():
+    p = plan_poi("BUY", 3889.0, 3885.0, bid=3890.0, ask=3890.2, pois=[(3887.5, 3886.5, "OB")],
+                 sl_dist=SL, tp_dist=TP, fallback="NONE")
+    assert p.kind == "LIMIT" and p.price == 3887.5

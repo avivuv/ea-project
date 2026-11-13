@@ -220,6 +220,14 @@ class Store:
         self.conn.commit()
         return cur.lastrowid
 
+    def set_trade_tp(self, trade_id: int, tp: float) -> None:
+        self.conn.execute("UPDATE trades SET tp=? WHERE id=?", (tp, trade_id))
+        self.conn.commit()
+
+    def signal_zero(self, signal_id: int) -> float | None:
+        row = self.conn.execute("SELECT zero FROM signals WHERE id=?", (signal_id,)).fetchone()
+        return None if row is None else row["zero"]
+
     def open_trades(self, mode: str | None = None) -> list[sqlite3.Row]:
         q = "SELECT * FROM trades WHERE close_utc IS NULL" + (" AND mode=?" if mode else "")
         return self.conn.execute(q, (mode,) if mode else ()).fetchall()
