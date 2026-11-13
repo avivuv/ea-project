@@ -23,7 +23,8 @@ from datetime import datetime, timedelta, timezone
 from telethon import errors, events
 
 from tg_signal import settings
-from tg_signal.entry_plan import limit_filled, pending_expired, plan_entry
+from tg_signal.detectors.poi import zone_pois
+from tg_signal.entry_plan import limit_filled, pending_expired, plan_entry, plan_poi
 from tg_signal.executor import MT5Executor
 from tg_signal.ingest import ingest_message
 from tg_signal.price_resolver import resolve_zone
@@ -84,6 +85,22 @@ class LiveTrader:
 
         sl_dist = settings.TG_SL_PIPS * PIP
         tp_dist = settings.TG_TP_PIPS * PIP
+        if settings.TG_ENTRY_MODE == "POI":
+            self._cancel_pendings(f"diganti sinyal #{msg_id}")      # sinyal terbaru menggantikan pending lama
+            pois = self._zone_pois(sig["direction"], zone.zero, zone.last)
+            plan = plan_poi(sig["direction"], zone.zero, zone.last, tick.bid, tick.ask, pois, sl_dist, tp_dist)
+            log.info("sinyal #%s %s | POI di zona: %s", msg_id, desc,
+                     ", ".join(f"{k} {min(a, b):.2f}-{max(a, b):.2f}" for a, b, k in pois) or "tidak ada")
+            if plan.kind == "REJECT":
+                self.store.set_status(sid, "REJECTED", plan.reason)
+                log.info("sinyal #%s %s | DITOLAK: %s", msg_id, desc, plan.reason)
+                return
+            if plan.kind == "LIMIT":
+                self._place_pending(sid, msg_id, sig["direction"], plan, f"{desc} | {plan.reason}")
+                return
+            self._open_market(sid, msg_id, sig["direction"], desc, sl=plan.sl, tp=plan.tp, tick=tick)
+            return
+
         if settings.TG_ENTRY_MODE == "ZONE":
             self._cancel_pendings(f"diganti sinyal #{msg_id}")      # sinyal terbaru menggantikan pending lama
             plan = plan_entry(sig["direction"], zone.zero, zone.last, tick.bid, tick.ask, sl_dist, tp_dist)
@@ -111,6 +128,64 @@ class LiveTrader:
             entry = tick.ask if g == 1 else tick.bid
             ticket, sl, tp, t_open = None, entry - g * sl_dist, entry + g * tp_dist, now
         self._record_open(sid, msg_id, sig["direction"], desc, ticket, t_open, entry, sl, tp)
+
+    # ── mode POI ────────────────────────────────────────────────────────────
+    def _zone_pois(self, direction, zero, last) -> list[tuple[float, float, str]]:
+        """POI (FVG/OB/IFVG) di dalam zona dari bar TG_POI_TF yang sudah close. Gagal ambil bar → []."""
+        try:
+            _, o, h, l, c = self.ex.rates(settings.TG_POI_TF, settings.TG_POI_BARS)
+        except RuntimeError as e:
+            log.warning("gagal ambil bar %s untuk POI: %s", settings.TG_POI_TF, e)
+            return []
+        return zone_pois(direction, o, h, l, c, zero, last, settings.TG_POI_TOL,
+                         settings.TG_POI_MAX_AGE, settings.TG_POI_MIN_SIZE)
+
+    def _reprice_pendings(self, pendings, tick) -> None:
+        """Tiap bar baru: batalkan pending yang sinyalnya gagal (lewat LAST ∓ SL) dan pindahkan limit ke POI
+        terdekat yang masih valid (POI lama gagal / muncul POI baru yang lebih dekat)."""
+        try:
+            t, *_ = self.ex.rates(settings.TG_POI_TF, 1)
+        except RuntimeError:
+            return
+        bar = int(t[-1])
+        if bar == getattr(self, "_poi_bar", None):
+            return
+        self._poi_bar = bar
+        sl_dist, tp_dist = settings.TG_SL_PIPS * PIP, settings.TG_TP_PIPS * PIP
+        live_orders = self.ex.pending_tickets() if self.mode == "DEMO" else set()
+        for p in pendings:
+            d = p["direction"]
+            if self.mode == "DEMO" and p["ticket"] not in live_orders:
+                continue                            # sudah terisi / hilang → ditangani _sync_pendings
+            pois = self._zone_pois(d, p["zero"], p["last"])
+            plan = plan_poi(d, p["zero"], p["last"], tick.bid, tick.ask, pois, sl_dist, tp_dist, allow_market=False)
+            if plan.kind == "REJECT":
+                if self.mode == "DEMO" and not self.ex.cancel_order(p["ticket"]):
+                    continue
+                self.store.set_status(p["sid"], "EXPIRED", "harga melewati LAST − SL tanpa fill")
+                log.info("pending %s %s @ %.2f hangus: harga sudah melewati LAST − SL", p["ticket"] or "paper",
+                         d, p["price"])
+                continue
+            if plan.kind != "LIMIT" or abs(plan.price - p["price"]) < 0.05:
+                continue
+            ticket = None
+            if self.mode == "DEMO":
+                if not self.ex.cancel_order(p["ticket"]):
+                    log.error("gagal membatalkan pending %s untuk dipindah", p["ticket"])
+                    continue
+                if self.ex.position_of(p["ticket"]) or self.ex.entry_deal(p["ticket"]):
+                    continue                        # terisi tepat sebelum dibatalkan → sync berikutnya
+                try:
+                    ticket = self.ex.place_limit(d, settings.TG_LOT, plan.price, plan.sl, plan.tp,
+                                                 comment=f"tgp{p['sid']}")
+                except RuntimeError as e:
+                    self.store.set_status(p["sid"], "CANCELLED", f"gagal pindah pending: {e}")
+                    log.error("pending sinyal %s gagal dipindah: %s", p["sid"], e)
+                    continue
+            self.store.set_status(p["sid"], "PENDING", (f"order {ticket}" if ticket else "paper") +
+                                  f" @ {plan.price:.2f}")
+            log.info("pending %s %s dipindah %.2f → %.2f (%s) SL %.2f TP %.2f", ticket or "paper", d,
+                     p["price"], plan.price, plan.reason, plan.sl, plan.tp)
 
     # ── mode ZONE ───────────────────────────────────────────────────────────
     def _open_market(self, sid, msg_id, direction, desc, sl, tp, tick) -> None:
@@ -141,21 +216,26 @@ class LiveTrader:
                 self.store.set_status(sid, "REJECTED", f"ORDER_FAILED: {e}")
                 log.error("sinyal #%s %s | PENDING GAGAL: %s", msg_id, desc, e)
                 return
-        self.store.set_status(sid, "PENDING", f"order {ticket}" if ticket else "paper")
+        self.store.set_status(sid, "PENDING", (f"order {ticket}" if ticket else "paper") + f" @ {plan.price:.2f}")
         log.info("sinyal #%s %s | %s %s LIMIT @ %.2f SL %.2f TP %.2f (order %s)", msg_id, desc, self.mode,
                  direction, plan.price, plan.sl, plan.tp, ticket or "paper")
 
     def _pendings(self) -> list[dict]:
-        """Pending aktif dari DB (bertahan saat program di-restart). SL/TP dihitung ulang dari zona."""
+        """Pending aktif dari DB (bertahan saat program di-restart). Harga limit dari status ("... @ harga"),
+        SL/TP dihitung ulang: mode POI dari harga limit, mode ZONE dari zona (SL = LAST ∓ SL)."""
         out = []
+        sl_dist, tp_dist = settings.TG_SL_PIPS * PIP, settings.TG_TP_PIPS * PIP
         for s in self.store.signals("PENDING"):
             g = 1 if s["direction"] == "BUY" else -1
-            ticket = None
-            if s["status_reason"].startswith("order "):
-                ticket = int(s["status_reason"].split()[1])
+            reason = s["status_reason"]
+            ticket = int(reason.split()[1]) if reason.startswith("order ") else None
+            price = float(reason.rsplit("@", 1)[1]) if "@" in reason else s["zero"]
+            if settings.TG_ENTRY_MODE == "POI":
+                sl, tp = price - g * sl_dist, price + g * tp_dist
+            else:
+                sl, tp = s["last"] - g * sl_dist, s["zero"] + g * tp_dist
             out.append({"sid": s["id"], "direction": s["direction"], "ticket": ticket, "zero": s["zero"],
-                        "sl": s["last"] - g * settings.TG_SL_PIPS * PIP,
-                        "tp": s["zero"] + g * settings.TG_TP_PIPS * PIP})
+                        "last": s["last"], "price": price, "sl": sl, "tp": tp})
         return out
 
     def _cancel_pendings(self, reason: str) -> None:
@@ -167,13 +247,16 @@ class LiveTrader:
                 if self.ex.position_of(p["ticket"]) or self.ex.entry_deal(p["ticket"]):
                     continue        # ternyata sudah terisi → biar sync() yang mencatat
             self.store.set_status(p["sid"], "CANCELLED", reason)
-            log.info("pending %s %s @ %.2f dibatalkan: %s", p["ticket"] or "paper", p["direction"], p["zero"], reason)
+            log.info("pending %s %s @ %.2f dibatalkan: %s", p["ticket"] or "paper", p["direction"], p["price"], reason)
 
     def _sync_pendings(self) -> None:
         pendings = self._pendings()
         if not pendings:
             return
         tick = self.ex.tick()
+        if settings.TG_ENTRY_MODE == "POI":
+            self._reprice_pendings(pendings, tick)
+            pendings = self._pendings()
         live_orders = self.ex.pending_tickets() if self.mode == "DEMO" else set()
         for p in pendings:
             d, sid = p["direction"], p["sid"]
@@ -198,8 +281,8 @@ class LiveTrader:
                 self.store.set_status(sid, "CANCELLED", "order hilang dari MT5 (dibatalkan manual?)")
                 log.warning("pending %s tidak ada lagi di MT5 dan tidak terisi", p["ticket"])
             else:
-                if limit_filled(d, p["zero"], tick.bid, tick.ask):
-                    self._record_fill(p, None, p["zero"], p["sl"], p["tp"], tick.time)
+                if limit_filled(d, p["price"], tick.bid, tick.ask):
+                    self._record_fill(p, None, p["price"], p["sl"], p["tp"], tick.time)
                 elif pending_expired(d, p["zero"], tick.bid, tick.ask, settings.TG_TP_PIPS * PIP):
                     self.store.set_status(sid, "EXPIRED", "TP tercapai tanpa fill")
                     log.info("pending paper %s @ %.2f hangus: harga sudah sampai TP tanpa fill", d, p["zero"])
@@ -217,7 +300,7 @@ class LiveTrader:
 
     def sync(self) -> None:
         """Pantau pending (terisi / hangus), lalu tandai trade yang sudah tutup (TP/SL)."""
-        if settings.TG_ENTRY_MODE == "ZONE":
+        if settings.TG_ENTRY_MODE in ("ZONE", "POI"):
             self._sync_pendings()
         trades = self.store.open_trades(self.mode)
         if not trades:
@@ -303,10 +386,10 @@ async def run(mode: str) -> None:
              "lot %s, maks posisi %s", st["server"], st["login"], st["demo"], st["balance"], st["currency"],
              mode, settings.TG_ENTRY_MODE, settings.TG_TP_PIPS, settings.TG_SL_PIPS,
              "LAST" if settings.TG_ENTRY_MODE == "ZONE" else settings.TG_SL_FROM, settings.TG_LOT,
-             settings.TG_MAX_POSITIONS)
+             settings.TG_MAX_POSITIONS or "tanpa batas")
     trader = LiveTrader(store, ex, mode)
-    if settings.TG_ENTRY_MODE != "ZONE":
-        trader._cancel_pendings("mode entry kembali ke MARKET")    # buang pending sisa mode ZONE
+    if settings.TG_ENTRY_MODE == "MARKET":
+        trader._cancel_pendings("mode entry kembali ke MARKET")    # buang pending sisa mode ZONE/POI
 
     client = _make_client()
     await client.start()

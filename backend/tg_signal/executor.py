@@ -51,8 +51,9 @@ class Closed:
 
 
 class MT5Executor:
-    def __init__(self, symbol: str = settings.SYMBOL):
+    def __init__(self, symbol: str = settings.SYMBOL, magic: int = settings.TG_MAGIC):
         self.symbol = symbol
+        self.magic = magic          # penanda order milik program ini (EA sinyal vs strategi sendiri)
         self.info = None
 
     # ── koneksi ─────────────────────────────────────────────────────────────
@@ -90,6 +91,24 @@ class MT5Executor:
         ts = datetime.fromtimestamp(t.time_msc / 1000 - settings.MT5_UTC_OFFSET_H * 3600, timezone.utc)
         return Tick(t.bid, t.ask, ts)
 
+    def rates(self, tf: str = "M1", count: int = 300):
+        """Bar yang SUDAH close (bar berjalan tidak ikut), urut lama → baru: (time, open, high, low, close)."""
+        r = mt5.copy_rates_from_pos(self.symbol, getattr(mt5, f"TIMEFRAME_{tf}"), 1, count)
+        if r is None or len(r) == 0:
+            raise RuntimeError(f"Tidak ada bar {tf}: {mt5.last_error()}")
+        return r["time"], r["open"], r["high"], r["low"], r["close"]
+
+    def rates_df(self, tf: str = "M5", count: int = 3000):
+        """Bar yang sudah close sebagai DataFrame (index UTC; open/high/low/close BID; spread dalam harga)."""
+        import pandas as pd
+        r = mt5.copy_rates_from_pos(self.symbol, getattr(mt5, f"TIMEFRAME_{tf}"), 1, count)
+        if r is None or len(r) == 0:
+            raise RuntimeError(f"Tidak ada bar {tf}: {mt5.last_error()}")
+        df = pd.DataFrame(r)
+        df["time"] = pd.to_datetime(df["time"], unit="s", utc=True) - pd.Timedelta(hours=settings.MT5_UTC_OFFSET_H)
+        df["spread"] = df["spread"] * self.info.point
+        return df.set_index("time")[["open", "high", "low", "close", "spread"]]
+
     # ── order ───────────────────────────────────────────────────────────────
     def _filling(self) -> int:
         fm = self.info.filling_mode
@@ -115,7 +134,7 @@ class MT5Executor:
         req = {
             "action": mt5.TRADE_ACTION_DEAL, "symbol": self.symbol, "volume": float(lot),
             "type": otype, "price": round(price, d), "sl": round(sl, d), "tp": round(tp, d),
-            "deviation": settings.TG_DEVIATION_POINTS, "magic": settings.TG_MAGIC,
+            "deviation": settings.TG_DEVIATION_POINTS, "magic": self.magic,
             "comment": comment[:31], "type_time": mt5.ORDER_TIME_GTC, "type_filling": self._filling(),
         }
         res = mt5.order_send(req)
@@ -137,7 +156,7 @@ class MT5Executor:
         req = {
             "action": mt5.TRADE_ACTION_DEAL, "symbol": self.symbol, "volume": float(lot),
             "type": otype, "price": round(price, d), "sl": round(sl, d), "tp": round(tp, d),
-            "deviation": settings.TG_DEVIATION_POINTS, "magic": settings.TG_MAGIC,
+            "deviation": settings.TG_DEVIATION_POINTS, "magic": self.magic,
             "comment": comment[:31], "type_time": mt5.ORDER_TIME_GTC, "type_filling": self._filling(),
         }
         res = mt5.order_send(req)
@@ -158,7 +177,7 @@ class MT5Executor:
         req = {
             "action": mt5.TRADE_ACTION_PENDING, "symbol": self.symbol, "volume": float(lot),
             "type": otype, "price": round(price, d), "sl": round(sl, d), "tp": round(tp, d),
-            "magic": settings.TG_MAGIC, "comment": comment[:31], "type_time": mt5.ORDER_TIME_GTC,
+            "magic": self.magic, "comment": comment[:31], "type_time": mt5.ORDER_TIME_GTC,
         }
         res = None
         for filling in (mt5.ORDER_FILLING_RETURN, self._filling()):   # broker beda-beda untuk pending
@@ -177,7 +196,7 @@ class MT5Executor:
 
     def pending_tickets(self) -> set[int]:
         orders = mt5.orders_get(symbol=self.symbol) or ()
-        return {o.ticket for o in orders if o.magic == settings.TG_MAGIC}
+        return {o.ticket for o in orders if o.magic == self.magic}
 
     def position_of(self, order_ticket: int):
         """Posisi yang dibuka oleh order ini (ticket posisi = ticket order pembuka), atau None."""
@@ -194,12 +213,12 @@ class MT5Executor:
 
     def open_tickets(self) -> set[int]:
         pos = mt5.positions_get(symbol=self.symbol) or ()
-        return {p.ticket for p in pos if p.magic == settings.TG_MAGIC}
+        return {p.ticket for p in pos if p.magic == self.magic}
 
     def floating_usd(self) -> float:
         """Profit mengambang (profit + swap) semua posisi milik program ini."""
         pos = mt5.positions_get(symbol=self.symbol) or ()
-        return round(sum(p.profit + p.swap for p in pos if p.magic == settings.TG_MAGIC), 2)
+        return round(sum(p.profit + p.swap for p in pos if p.magic == self.magic), 2)
 
     def close_position(self, ticket: int, comment: str = "target harian") -> bool:
         """Tutup posisi dengan order market berlawanan. True bila berhasil / sudah tidak ada."""
@@ -213,7 +232,7 @@ class MT5Executor:
             "action": mt5.TRADE_ACTION_DEAL, "symbol": self.symbol, "volume": p.volume, "position": p.ticket,
             "type": mt5.ORDER_TYPE_SELL if buy else mt5.ORDER_TYPE_BUY,
             "price": tk.bid if buy else tk.ask, "deviation": settings.TG_DEVIATION_POINTS,
-            "magic": settings.TG_MAGIC, "comment": comment[:31], "type_time": mt5.ORDER_TIME_GTC,
+            "magic": self.magic, "comment": comment[:31], "type_time": mt5.ORDER_TIME_GTC,
             "type_filling": self._filling(),
         }
         res = mt5.order_send(req)

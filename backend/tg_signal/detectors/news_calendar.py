@@ -153,3 +153,34 @@ async def get_upcoming_events(pair: str) -> str:
     for e in relevant[:5]:
         lines.append(f"  [{e['country']}] {e['time']} {e['date']} — {e['title']}")
     return "\n".join(lines)
+
+
+# ── Versi sinkron untuk filter news live (feed JSON: jam sudah berzona waktu, tanpa ambiguitas) ──
+JSON_URL = "https://nfs.faireconomy.media/ff_calendar_thisweek.json"
+_sync_cache: dict = {}
+
+
+def high_impact_times(currencies: set[str] | None = None, max_age_sec: int = CACHE_SECONDS) -> list[datetime]:
+    """Waktu (UTC) event HIGH impact minggu ini untuk mata uang tertentu (default USD). Cache 1 jam;
+    fetch gagal → pakai cache lama (atau list kosong)."""
+    currencies = currencies or {"USD"}
+    now = time.time()
+    if _sync_cache.get("ts") is None or now - _sync_cache["ts"] > max_age_sec:
+        try:
+            resp = httpx.get(JSON_URL, timeout=15, headers=HEADERS, follow_redirects=True)
+            resp.raise_for_status()
+            _sync_cache["events"] = resp.json()
+            log.info(f"[ForexCalendar] {len(_sync_cache['events'])} event minggu ini diambil")
+        except Exception as exc:
+            log.warning(f"[ForexCalendar] fetch JSON gagal: {exc}")
+            _sync_cache.setdefault("events", [])
+        _sync_cache["ts"] = now
+    out = []
+    for e in _sync_cache.get("events", []):
+        if str(e.get("impact", "")).upper() != "HIGH" or str(e.get("country", "")).upper() not in currencies:
+            continue
+        try:
+            out.append(datetime.fromisoformat(e["date"]).astimezone(timezone.utc))
+        except (KeyError, ValueError):
+            continue
+    return sorted(out)

@@ -20,6 +20,9 @@ def test_rejections():
     assert check("BUY", 4162, 0.7, RiskState(1.7, pnl_today_usd=9.99), LIM) == (True, "")
     assert check("BUY", 4162, 0.7, RiskState(1.7, trades_today=40), LIM)[1] == "MAX_TRADES_DAY"
     assert check("SELL", 4142, 0.7, RiskState(1.7, open_positions=[("BUY", 0.0)]), LIM)[1] == "MAX_POSITIONS"
+    from dataclasses import replace
+    unl = replace(LIM, max_positions=0)
+    assert check("SELL", 4142, 0.7, RiskState(1.7, open_positions=[("BUY", 0.0)] * 9), unl) == (True, "")
     assert check("BUY", 4162, 0.7, RiskState(1.7, price_age_sec=30), LIM)[1] == "PRICE_STALE"
 
 

@@ -49,7 +49,7 @@ def check(direction: str, zone_zero: float, zone_distance: float,
         return False, "DAILY_PROFIT_TARGET"
     if st.trades_today >= lim.max_trades_day:
         return False, "MAX_TRADES_DAY"
-    if len(st.open_positions) >= lim.max_positions:
+    if lim.max_positions > 0 and len(st.open_positions) >= lim.max_positions:   # 0 = tanpa batas
         return False, "MAX_POSITIONS"
     if any(d == direction and abs(z - zone_zero) < 0.01 for d, z in st.open_positions):
         return False, "DUPLICATE_OPEN"

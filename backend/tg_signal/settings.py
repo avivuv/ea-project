@@ -71,7 +71,15 @@ TG_POLL_SEC = _f("TG_POLL_SEC", 3)          # cek aktif pesan baru (push Telegra
 # ZONE (keputusan user 12 Nov 2026): sudah di zona → market, belum → pending limit di ZERO,
 #      SL = LAST ∓ TG_SL_PIPS. MARKET: entry market saat sinyal diterima, SL dari TG_SL_FROM.
 #      12 Nov 2026 (malam): user minta kembali ke MARKET sebagai default.
-TG_ENTRY_MODE = os.getenv("TG_ENTRY_MODE", "MARKET").upper()
+# POI (keputusan user 13 Nov 2026): detektor FVG/OB/IFVG mencari POI di dalam zona sinyal → pending di
+#      POI terdekat (tanpa POI → pending di ZERO); harga sudah di zona → market. SL/TP dari harga entry.
+#      Pending dipindah tiap bar baru bila POI gagal / muncul POI yang lebih dekat. Lihat entry_plan.plan_poi.
+TG_ENTRY_MODE = os.getenv("TG_ENTRY_MODE", "POI").upper()     # MARKET | ZONE | POI
+TG_POI_TF = os.getenv("TG_POI_TF", "M1").upper()               # timeframe deteksi POI
+TG_POI_BARS = _i("TG_POI_BARS", 300)                           # jumlah bar yang dipindai
+TG_POI_MAX_AGE = _i("TG_POI_MAX_AGE", 240)                     # umur maks POI (bar)
+TG_POI_TOL = _f("TG_POI_TOL", 0.5)                             # zona diperlebar $ ini saat cari POI
+TG_POI_MIN_SIZE = _f("TG_POI_MIN_SIZE", 0.2)                   # ukuran minimum FVG/OB ($)
 TG_TP_PIPS = _f("TG_TP_PIPS", 30)                       # TP = SL = 30 pips (keputusan user)
 TG_SL_FROM = os.getenv("TG_SL_FROM", "entry")           # entry | zone (LAST − SL)
 TG_MAGIC = _i("TG_MAGIC", 990011)                       # penanda order milik program ini
@@ -80,7 +88,7 @@ PAUSE_FILE = DATA_DIR / "PAUSE"                         # kill switch: file ada 
 
 # ── Risk ────────────────────────────────────────────────────────────────────
 TG_LOT = _f("TG_LOT", 0.01)
-TG_MAX_POSITIONS = _i("TG_MAX_POSITIONS", 1)
+TG_MAX_POSITIONS = _i("TG_MAX_POSITIONS", 0)            # 0 = tanpa batas (13 Nov 2026: user minta semua sinyal dieksekusi)
 TG_MAX_TRADES_DAY = _i("TG_MAX_TRADES_DAY", 40)
 TG_DAILY_LOSS_USD = _f("TG_DAILY_LOSS_USD", 30.0)
 TG_DAILY_PROFIT_USD = _f("TG_DAILY_PROFIT_USD", 100.0) # tertutup+floating >= ini → tutup semua & stop; 0 = off (dibuat tinggi: BT $10 tidak membantu)
@@ -91,3 +99,9 @@ TG_DAY_TZ_HOURS = 7                                     # hari trading dihitung 
 def pips_to_price(pips: float) -> float:
     """Satu-satunya konversi pip → jarak harga (RULES §4)."""
     return round(pips * PIP_SIZE, 2)
+
+# ── Strategi sendiri (pro_live.py, keputusan user 13 Nov 2026: langsung DEMO) ──────────────
+PRO_MAGIC = _i("PRO_MAGIC", 990022)                     # beda dari TG_MAGIC: order tidak tercampur
+PRO_LOT = _f("PRO_LOT", 0.01)
+PRO_BARS = _i("PRO_BARS", 3000)                         # bar M5 yang dibaca tiap bar baru (~10 hari)
+PRO_NEWS_MIN = _f("PRO_NEWS_MIN", 15)                   # +- menit dari news HIGH USD: tanpa setup/entry baru; 0 = off

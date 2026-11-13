@@ -46,6 +46,8 @@ Setiap transisi **dicatat** di SQLite dengan timestamp dan alasan.
 - Bila konfirmasi dinilai lemah (definisi O6 di PLAN) → wajib keduanya (OBIM).
 - Evaluasi hanya pada **candle yang sudah close** — tidak boleh pakai candle berjalan.
 - Entry = market order di harga saat konfirmasi (atau limit di FVG mid — diputuskan Tahap 2).
+- Mode entry live `TG_ENTRY_MODE`: `MARKET` | `ZONE` | `POI` (default, PLAN D10). Mode POI: pending di POI
+  (FVG/OB/IFVG) terdekat di dalam zona, harga sudah di zona → market, pending dipindah tiap bar baru.
 
 ## 4. SL / TP
 
@@ -60,7 +62,7 @@ Setiap transisi **dicatat** di SQLite dengan timestamp dan alasan.
 | Aturan | Default |
 |---|---|
 | Lot | `TG_LOT` = 0.01 (atau risk-based bila O1 diputuskan begitu) |
-| Max posisi bersamaan | `TG_MAX_POSITIONS` = 1 |
+| Max posisi bersamaan | `TG_MAX_POSITIONS` = 0 (tanpa batas, keputusan user 13 Nov 2026; isi >0 untuk membatasi) |
 | Max trade per hari | `TG_MAX_TRADES_DAY` = 10 |
 | Daily loss limit | `TG_DAILY_LOSS_USD` (mis. $10 untuk lot 0.01) → pause sampai hari berikut |
 | Daily profit target | `TG_DAILY_PROFIT_USD` (default $100 — praktis jaring pengaman saja; 0 = off; backtest Agu–Nov 2026: target $10 malah −$416 vs −$381 tanpa target) → profit tertutup + floating hari ini ≥ target → semua posisi ditutup market (outcome `TARGET`), pending dibatalkan, stop buka order sampai hari berikut (WIB) |

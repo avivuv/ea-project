@@ -15,7 +15,7 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class EntryPlan:
-    kind: str            # MARKET | LIMIT | REJECT
+    kind: str            # MARKET | LIMIT | REJECT | NONE
     price: float = 0.0   # MARKET: perkiraan harga isi · LIMIT: harga limit
     sl: float = 0.0
     tp: float = 0.0
@@ -46,3 +46,32 @@ def pending_expired(direction: str, zero: float, bid: float, ask: float, tp_dist
     if direction == "BUY":
         return bid >= zero + tp_dist
     return ask <= zero - tp_dist
+
+
+def plan_poi(direction: str, zero: float, last: float, bid: float, ask: float,
+             pois: list[tuple[float, float, str]], sl_dist: float, tp_dist: float,
+             allow_market: bool = True) -> EntryPlan:
+    """Mode POI (TG_ENTRY_MODE=POI): pending di POI (FVG/OB/IFVG) yang ada di dalam zona sinyal.
+
+    - Harga melewati LAST ∓ SL → REJECT (sinyal sudah gagal).
+    - Harga sudah di zona (BUY: ask ≤ ZERO) dan allow_market → MARKET.
+    - Ada POI yang tepi proximal-nya masih di bawah harga (BUY) → LIMIT di POI terdekat.
+    - Tidak ada POI → LIMIT di ZERO (sama seperti mode ZONE); bila harga sudah di bawah ZERO → NONE.
+    SL/TP dihitung dari harga entry (SL = entry ∓ sl_dist, TP = entry ± tp_dist).
+    pois: hasil detectors.poi.zone_pois → (proximal, distal, jenis).
+    """
+    g = 1 if direction == "BUY" else -1
+    fill_px = ask if g == 1 else bid
+    exit_px = bid if g == 1 else ask
+    if g * (exit_px - (last - g * sl_dist)) <= 0:
+        return EntryPlan("REJECT", reason="PAST_SL")
+    if allow_market and g * (fill_px - zero) <= 0:
+        return EntryPlan("MARKET", fill_px, fill_px - g * sl_dist, fill_px + g * tp_dist, "harga sudah di zona")
+    ahead = [p for p in pois if g * (fill_px - p[0]) > 0]
+    if ahead:
+        prox, dist, kind = max(ahead, key=lambda p: g * p[0])
+        return EntryPlan("LIMIT", prox, prox - g * sl_dist, prox + g * tp_dist,
+                         f"POI {kind} {min(prox, dist):.2f}-{max(prox, dist):.2f}")
+    if g * (fill_px - zero) > 0:
+        return EntryPlan("LIMIT", zero, zero - g * sl_dist, zero + g * tp_dist, "tanpa POI → ZERO")
+    return EntryPlan("NONE", reason="tidak ada POI di depan harga")

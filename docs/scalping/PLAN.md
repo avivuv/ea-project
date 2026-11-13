@@ -143,13 +143,14 @@ Tahap 3 ditahan sampai ada keputusan arah (lihat BACKTEST_2026-11.md).
 | D7 | Sumber | Grup Telegram dosen, dibaca via Telethon (akun user member) |
 | D8 | Masa berlaku sinyal | Valid sampai sinyal hit TP/SL (dari zona); setelah itu tidak dipakai lagi. Tanpa timeout waktu, tanpa re-entry |
 | D9 | Entry live (12 Nov 2026) | `TG_ENTRY_MODE=ZONE`: ikuti harga sinyal. Saat sinyal datang harga sudah di zona → market; belum → pending limit di ZERO. SL = LAST ∓ 30 pips, TP = entry ± 30 pips. Pending hangus bila harga sampai ZERO ± 30 pips tanpa fill; sinyal baru menggantikan pending lama. Dipilih user walau backtest no. 11 lebih buruk dari market — dievaluasi di demo |
+| D10 | Entry live POI (13 Nov 2026) | `TG_ENTRY_MODE=POI` (default): detektor FVG/OB/IFVG (`detectors/poi.py`, bar `TG_POI_TF`=M1) mencari POI di zona sinyal ± $0.5. Harga sudah di zona → market; belum → pending di tepi POI terdekat (tanpa POI → di ZERO). SL/TP 30 pips dari harga entry. Tiap bar baru pending dipindah bila POI gagal/muncul POI lebih dekat; batal bila harga lewat LAST ∓ SL atau sampai ZERO ± TP tanpa fill. Diminta user walau backtest 2511 sinyal: semua varian POI PF < 1 (lihat `poi_backtest.py`) — dievaluasi di demo |
 
 ### Masih terbuka (diputuskan setelah Tahap 2)
 | # | Topik | Opsi |
 |---|---|---|
 | O1 | Lot | Tetap 0.01 / berbasis risk % |
 | O2 | Aturan TP | 10 / 20 / 30 / partial + BE |
-| O3 | Max posisi bersamaan | 1 / 2 / 3 |
+| O3 | Max posisi bersamaan | Tanpa batas (13 Nov 2026) — semua sinyal dieksekusi; `TG_MAX_POSITIONS` = 0 |
 | O5 | Arti ZERO/MID/LAST | Dugaan di SIGNAL_SPEC, divalidasi via backtest |
 | O6 | Definisi "konfirmasi lemah" | Mis. FVG kecil (< X), OB lama, melawan trend M5 |
 | O7 | Entry tanpa konfirmasi di tepi zona? | Karena 13/20 sinyal ZERO-TP, mungkin perlu |
