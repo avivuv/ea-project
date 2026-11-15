@@ -23,7 +23,7 @@ echo   TRADING XAUUSD - akun DEMO
 echo ============================================================
 call :status_list
 echo ------------------------------------------------------------
-echo   1. Start semua  (EA sinyal, swing, strategi sendiri, dashboard)
+echo   1. Start semua  (EA sinyal, swing, SMC Top-Down, dashboard)
 echo   2. Stop semua   (posisi dan pending di MT5 TIDAK ditutup)
 echo   3. Buka dashboard di browser
 echo   4. Refresh status
@@ -62,7 +62,7 @@ exit /b
 echo Pastikan MT5 terbuka dan tombol "Algo Trading" menyala.
 call :launch tg_signal.run_live "EA sinyal" "tg_signal.run_live --mode DEMO"
 call :launch intraday.swing_live "Swing" "intraday.swing_live"
-call :launch tg_signal.pro_live "Strategi sendiri" "tg_signal.pro_live --mode DEMO"
+call :launch tg_signal.pro_live "SMC Top-Down" "tg_signal.pro_live --mode DEMO"
 call :launch tg_signal.dashboard "Dashboard" "tg_signal.dashboard"
 exit /b
 
@@ -84,7 +84,7 @@ echo   Semua program dihentikan.
 exit /b
 
 :status_list
-powershell -NoProfile -Command "$p = Get-CimInstance Win32_Process -Filter \"Name='python.exe'\"; foreach ($m in @('tg_signal.run_live|EA sinyal Telegram','intraday.swing_live|Swing Donchian','tg_signal.pro_live|Strategi sendiri','tg_signal.dashboard|Dashboard')) { $k,$n = $m.Split('|'); $x = $p | Where-Object { $_.CommandLine -like ('*' + $k + '*') } | Select-Object -First 1; if ($x) { Write-Host ('  [JALAN] ' + $n + '  sejak ' + $x.CreationDate.ToString('dd/MM HH:mm')) -ForegroundColor Green } else { Write-Host ('  [MATI ] ' + $n) -ForegroundColor Red } }"
+powershell -NoProfile -Command "$p = Get-CimInstance Win32_Process -Filter \"Name='python.exe'\"; foreach ($m in @('tg_signal.run_live|EA sinyal Telegram','intraday.swing_live|Swing Donchian','tg_signal.pro_live|SMC Top-Down','tg_signal.dashboard|Dashboard')) { $k,$n = $m.Split('|'); $x = $p | Where-Object { $_.CommandLine -like ('*' + $k + '*') } | Select-Object -First 1; if ($x) { Write-Host ('  [JALAN] ' + $n + '  sejak ' + $x.CreationDate.ToString('dd/MM HH:mm')) -ForegroundColor Green } else { Write-Host ('  [MATI ] ' + $n) -ForegroundColor Red } }"
 exit /b
 
 :run

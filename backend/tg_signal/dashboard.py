@@ -1,7 +1,7 @@
 """
 Dashboard monitoring (NiceGUI) — HANYA MEMBACA database, log, dan akun MT5.
-Kontrol: Pause/Resume (file data/PAUSE: EA sinyal & strategi sendiri) dan Pause swing.
-Bagian: EA sinyal Telegram, swing Donchian, strategi sendiri (pro_live).
+Kontrol: Pause/Resume (file data/PAUSE: EA sinyal & SMC Top-Down) dan Pause swing.
+Bagian: EA sinyal Telegram, swing Donchian, SMC Top-Down (pro_live).
 
     python -m tg_signal.dashboard            # buka http://127.0.0.1:8080
     python -m tg_signal.dashboard --port 8081
@@ -115,7 +115,7 @@ def swing_snapshot() -> dict:
 
 
 def pro_snapshot() -> dict:
-    """Posisi, pending, dan deal tutup strategi sendiri (magic PRO_MAGIC). Gagal -> dict kosong."""
+    """Posisi, pending, dan deal tutup SMC Top-Down (magic PRO_MAGIC). Gagal -> dict kosong."""
     try:
         import MetaTrader5 as mt5
         if not mt5.initialize():
@@ -197,7 +197,7 @@ def build() -> None:
     with ui.tabs().classes("w-full").props("align=left inline-label") as tabs:
         tab_sig = ui.tab("EA sinyal Telegram", icon="send")
         tab_sw = ui.tab("Swing Donchian", icon="trending_up")
-        tab_pro = ui.tab("Strategi sendiri", icon="insights")
+        tab_pro = ui.tab("SMC Top-Down", icon="insights")
     with ui.tab_panels(tabs, value=tab_sig).classes("w-full").style("background: transparent"):
         with ui.tab_panel(tab_sig).classes("p-0 gap-3"):
             with ui.row().classes("w-full items-center justify-between"):
@@ -352,10 +352,10 @@ def build() -> None:
                     sw_log.text = "\n".join(l[5:] for l in reversed(lines))
 
         with ui.tab_panel(tab_pro).classes("p-0 gap-3"):
-            # ── Strategi sendiri ────────────────────────────────────────────────────
+            # ── SMC Top-Down ────────────────────────────────────────────────────
             with ui.row().classes("w-full items-center justify-between"):
                 with ui.column().classes("gap-0"):
-                    ui.label("Strategi sendiri — SMC top-down XAUUSD").classes("text-xl font-semibold")
+                    ui.label("SMC Top-Down XAUUSD").classes("text-xl font-semibold")
                     ui.label("Bias EMA50 H1 (kemiringan > 0,1 ATR) · POI M15 FVG/OB/IFVG · konfirmasi CHoCH M5 · "
                              f"entry FVG M5 · RR 1:3 · SL maks 100 pips · lot {settings.PRO_LOT} · "
                              f"tanpa entry ±{settings.PRO_NEWS_MIN:g} mnt news USD · ikut tombol Pause di atas").classes("sub")
@@ -374,7 +374,7 @@ def build() -> None:
                     pro_s = ui.label("").classes("sub num")
             with ui.row().classes("w-full gap-3 items-start no-wrap max-md:flex-wrap"):
                 with ui.element("div").classes("card flex-1 min-w-[320px]"):
-                    ui.label("Trade strategi sendiri").classes("label")
+                    ui.label("Trade SMC Top-Down").classes("label")
                     pro_table = ui.table(columns=[
                         {"name": "tutup", "label": "Tutup", "field": "tutup", "align": "left"},
                         {"name": "arah", "label": "Arah", "field": "arah", "align": "left"},
@@ -384,13 +384,13 @@ def build() -> None:
                         {"name": "usd", "label": "USD", "field": "usd", "align": "right"},
                     ], rows=[], row_key="k", pagination=8).classes("w-full").props("dense flat dark")
                 with ui.element("div").classes("card flex-1 min-w-[320px]"):
-                    ui.label("Log strategi sendiri").classes("label")
+                    ui.label("Log SMC Top-Down").classes("label")
                     pro_log = ui.label("").classes("logbox")
 
             def refresh_pro() -> None:
                 txt, cls = file_status("pro_live.log", "pro_heartbeat")
                 paused = settings.PAUSE_FILE.exists()
-                pro_prog.text = f"● Strategi sendiri: {txt}" + (" · PAUSE" if paused else "")
+                pro_prog.text = f"● SMC Top-Down: {txt}" + (" · PAUSE" if paused else "")
                 pro_prog.classes(replace=f"font-semibold {('warn' if paused else cls)}")
                 snap = pro_snapshot()
                 closed = snap.get("closed", [])
