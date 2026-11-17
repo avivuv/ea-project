@@ -1,7 +1,8 @@
 """
 Dashboard monitoring (NiceGUI) — HANYA MEMBACA database, log, dan akun MT5.
-Kontrol: Pause/Resume (file data/PAUSE: EA sinyal, SMC Top-Down & ORB NY) dan Pause swing.
-Bagian: EA sinyal Telegram, swing Donchian, SMC Top-Down (pro_live), ORB NY XAUUSD & ETHUSD (orb_live).
+Kontrol: Pause/Resume (file data/PAUSE: EA sinyal, SMC Top-Down & ORB NY), Pause swing, Pause BUMI.
+Bagian: EA sinyal Telegram, swing Donchian, BUMI 4 MA (bumi_live), SMC Top-Down (pro_live),
+ORB NY XAUUSD & ETHUSD (orb_live).
 
     python -m tg_signal.dashboard            # buka http://127.0.0.1:8080
     python -m tg_signal.dashboard --port 8081
@@ -95,13 +96,19 @@ SWING_METHODS = [  # sama dengan intraday.swing_live.METHODS (tidak di-import ag
 ]
 
 
-def swing_snapshot() -> dict:
-    """Posisi & deal tutup EA swing (dibedakan lewat magic). Gagal → dict kosong."""
+BUMI_METHODS = [  # sama dengan tg_signal.bumi_live.METHODS (id, simbol, keterangan, magic)
+    ("XAU_H4_BUMI", "XAUUSD", "BUMI H4 · cross langsung · SL 3 ATR", 26111701),
+    ("XAU_H1_BUMI", "XAUUSD", "BUMI H1 · cross langsung · SL 3 ATR", 26111702),
+]
+
+
+def swing_snapshot(methods=SWING_METHODS) -> dict:
+    """Posisi & deal tutup runner multi-metode (dibedakan lewat magic). Gagal → dict kosong."""
     try:
         import MetaTrader5 as mt5
         if not mt5.initialize():
             return {}
-        magics = {m[3]: m for m in SWING_METHODS}
+        magics = {m[3]: m for m in methods}
         pos = {}
         for p in mt5.positions_get() or ():
             if p.magic in magics:
@@ -313,6 +320,7 @@ def build() -> None:
     with ui.tabs().classes("w-full").props("align=left inline-label") as tabs:
         tab_sig = ui.tab("EA sinyal Telegram", icon="send")
         tab_sw = ui.tab("Swing Donchian", icon="trending_up")
+        tab_bumi = ui.tab("BUMI 4 MA", icon="show_chart")
         tab_pro = ui.tab("SMC Top-Down", icon="insights")
         tab_orb = ui.tab("ORB NY", icon="schedule")
     with ui.tab_panels(tabs, value=tab_sig).classes("w-full").style("background: transparent"):
@@ -467,6 +475,105 @@ def build() -> None:
                 if log.exists():
                     lines = log.read_text(encoding="utf-8", errors="replace").splitlines()[-40:]
                     sw_log.text = "\n".join(l[5:] for l in reversed(lines))
+
+        with ui.tab_panel(tab_bumi).classes("p-0 gap-3"):
+            # ── BUMI 4 MA (bumi_live) ───────────────────────────────────────────
+            bumi_pause = settings.DATA_DIR / "PAUSE_BUMI"
+            bumi_state = settings.DATA_DIR / "bumi_state.json"
+            with ui.row().classes("w-full items-center justify-between"):
+                with ui.column().classes("gap-0"):
+                    ui.label("BUMI 4 MA — XAUUSD H4 & H1").classes("text-xl font-semibold")
+                    ui.label("SMA 5/13/21/34 · entry saat MA5 pindah ke atas/bawah ketiga MA + EMA200 searah "
+                             "(10 bar) · SL 3 ATR14 · tanpa TP, exit saat MA5 cross balik · risiko 0,5%/trade "
+                             "(minimal lot 0,01; skip hanya bila > 5%) · 1 posisi per metode").classes("sub")
+                with ui.row().classes("items-center gap-3"):
+                    bu_prog = ui.label("").classes("font-semibold")
+                    bu_btn = ui.button("").props("unelevated")
+            with ui.grid(columns="repeat(auto-fit, minmax(300px, 1fr))").classes("w-full gap-3"):
+                bu_cards = {}
+                for mid, sym, desc, _ in BUMI_METHODS:
+                    with ui.element("div").classes("card"):
+                        ui.label(f"{sym} · {mid}").classes("label")
+                        ui.label(desc).classes("sub")
+                        v = ui.label("-").classes("value num")
+                        s = ui.label("").classes("sub num")
+                        ma = ui.label("").classes("sub num")
+                        bu_cards[mid] = (v, s, ma)
+            with ui.row().classes("w-full gap-3 items-start no-wrap max-md:flex-wrap"):
+                with ui.element("div").classes("card flex-1 min-w-[320px]"):
+                    bu_sum = ui.label("Trade BUMI tutup").classes("label")
+                    bu_table = ui.table(columns=[
+                        {"name": "tutup", "label": "Tutup", "field": "tutup", "align": "left"},
+                        {"name": "metode", "label": "Metode", "field": "metode", "align": "left"},
+                        {"name": "usd", "label": "USD", "field": "usd", "align": "right"},
+                    ], rows=[], row_key="k", pagination=8).classes("w-full").props("dense flat dark")
+                with ui.element("div").classes("card flex-1 min-w-[320px]"):
+                    ui.label("Log BUMI").classes("label")
+                    bu_log = ui.label("").classes("logbox")
+
+            def toggle_bumi() -> None:
+                if bumi_pause.exists():
+                    bumi_pause.unlink(); ui.notify("BUMI resume: entry baru diizinkan")
+                else:
+                    bumi_pause.write_text("pause dari dashboard"); ui.notify("BUMI pause: tanpa entry baru (exit tetap jalan)")
+                refresh()
+
+            def confirm_bumi() -> None:
+                with ui.dialog() as dlg, ui.card():
+                    ui.label("Lanjutkan entry BUMI?" if bumi_pause.exists()
+                             else "Hentikan entry BUMI baru? Posisi terbuka & exit cross MA tetap berjalan.")
+                    with ui.row():
+                        ui.button("Ya", on_click=lambda: (dlg.close(), toggle_bumi()))
+                        ui.button("Batal", on_click=dlg.close).props("flat")
+                dlg.open()
+
+            bu_btn.on_click(confirm_bumi)
+
+            def refresh_bumi() -> None:
+                txt, cls = file_status("bumi_live.log", "bumi_heartbeat")
+                paused = bumi_pause.exists()
+                bu_prog.text = f"● BUMI: {txt}" + (" · PAUSE" if paused else "")
+                bu_prog.classes(replace=f"font-semibold {('warn' if paused else cls)}")
+                bu_btn.text = "Resume BUMI" if paused else "Pause BUMI"
+                try:
+                    infos = json.loads(bumi_state.read_text(encoding="utf-8")).get("info", {})
+                except Exception:
+                    infos = {}
+                snap = swing_snapshot(BUMI_METHODS)
+                closed = snap.get("closed", [])
+                for mid, sym, _, magic in BUMI_METHODS:
+                    v, s, ma = bu_cards[mid]
+                    p = snap.get("pos", {}).get(magic)
+                    tot = sum(c["usd"] for c in closed if c["id"] == mid)
+                    n = sum(1 for c in closed if c["id"] == mid)
+                    if p:
+                        v.text = f"{p['profit']:+.2f} USD"
+                        v.classes(replace="value num " + ("good" if p["profit"] > 0 else "bad" if p["profit"] < 0 else ""))
+                        s.text = (f"{p['dir']} {p['lot']} @ {p['entry']:g} · SL {p['sl']:g} · sejak "
+                                  f"{(p['time'] + WIB):%d/%m %H:%M} WIB · tutup: {n} trade {tot:+.2f}")
+                    else:
+                        v.text = "tanpa posisi"
+                        v.classes(replace="value num")
+                        s.text = f"menunggu MA5 cross · tutup: {n} trade {tot:+.2f} USD"
+                    i = infos.get(mid)
+                    if i:
+                        bar = (pd.Timestamp(i["bar"]) + WIB).strftime("%d/%m %H:%M")
+                        m5, m13, m21, m34 = i["ma"]
+                        ma.text = (f"bar {bar} WIB · close {i['close']:g} · {i['state']} · EMA200 {i['slope']} · "
+                                   f"MA 5/13/21/34: {m5:g} / {m13:g} / {m21:g} / {m34:g} · SL bila sinyal "
+                                   f"{i['sl_dist']:g}" + (f" · sinyal terakhir {i['last_signal']}"
+                                                          if i.get("last_signal") else ""))
+                    else:
+                        ma.text = "belum ada data dari runner"
+                total = sum(c["usd"] for c in closed)
+                bu_sum.text = f"Trade BUMI tutup · {len(closed)} trade · total {total:+.2f} USD"
+                bu_table.rows = [{"k": i, "tutup": (c["time"] + WIB).strftime("%d/%m %H:%M"), "metode": c["id"],
+                                  "usd": f"{c['usd']:+.2f}"} for i, c in enumerate(reversed(closed))]
+                bu_table.update()
+                log = settings.DATA_DIR / "bumi_live.log"
+                if log.exists():
+                    lines = log.read_text(encoding="utf-8", errors="replace").splitlines()[-40:]
+                    bu_log.text = "\n".join(l[5:] for l in reversed(lines))
 
         with ui.tab_panel(tab_pro).classes("p-0 gap-3"):
             # ── SMC Top-Down ────────────────────────────────────────────────────
@@ -675,6 +782,7 @@ def build() -> None:
             lines = log.read_text(encoding="utf-8", errors="replace").splitlines()[-40:]
             logbox.text = "\n".join(l[11:] for l in reversed(lines))
         refresh_swing()
+        refresh_bumi()
         refresh_pro()
         refresh_orb()
 
