@@ -34,7 +34,8 @@ from tg_signal.detectors.news_calendar import high_impact_times
 from tg_signal.executor import MT5Executor
 
 log = logging.getLogger("tg_signal.pro")
-CFG = ps.Cfg("ema", False, False, "fvg", 3.0, False, False)
+CFG = ps.Cfg("ema", False, False, "fvg", 3.0, False, False, min_pb=1.0)
+# min_pb 1.0: pullback ke POI ≥ 1 ATR H1 (pro_pb_check 17 Nov 2026: PF 1.40/1.58 → 1.86/1.83, DD 20R → 12R)
 EMA_SPAN, BIAS_TF = 50, 60
 MIN_SLOPE = 0.1            # EMA50 H1 harus bergerak > 0.1 ATR / 3 bar (pro_sl_analysis: DD 34R → 16R di uji)
 HEARTBEAT = settings.DATA_DIR / "pro_heartbeat"

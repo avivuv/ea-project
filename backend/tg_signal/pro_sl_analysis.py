@@ -17,7 +17,7 @@ import pandas as pd
 from tg_signal import pro_strategy as ps
 from tg_signal import settings
 from tg_signal.market_data import load_m1
-from tg_signal.pro_live import CFG
+from tg_signal.pro_live import CFG, MIN_SLOPE
 
 PIP = settings.PIP_SIZE
 
@@ -29,7 +29,7 @@ def htf(df: pd.DataFrame, minutes: int, t5: np.ndarray):
 
 
 def build(df: pd.DataFrame) -> pd.DataFrame:
-    mk = ps.Market(df, 50, 60)
+    mk = ps.Market(df, 50, 60, MIN_SLOPE)
     rows = []
     t5 = mk.t
     h1, k1 = htf(df, 60, t5)

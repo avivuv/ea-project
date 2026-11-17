@@ -15,6 +15,8 @@ Alur per arah (BUY; SELL kebalikannya, dihitung di ruang harga dinegasikan):
    Batal bila M5 close di bawah POI atau tidak ada konfirmasi dalam 36 bar (3 jam).
 6. Sapuan likuiditas (opsional): low sejak armed menembus swing low M5 (fractal ±2) 60 bar terakhir.
 7. Konfirmasi CHoCH M5: close di atas swing high M5 terakhir sebelum low terendah sejak armed.
+   Filter pullback (opsional, min_pb): high tertinggi 4 jam terakhir → low terendah sesudahnya harus
+   ≥ min_pb × ATR14 bias TF; pullback dangkal (harga belum benar-benar koreksi) → setup dibuang.
 8. Entry: close = market di open bar berikutnya | fvg = limit di tepi atas FVG M5 terbaru pada kaki
    CHoCH (berlaku 12 bar; tanpa FVG → market).
 9. SL = low terendah sejak armed − $0.3. Risiko harus 10–100 pips ($1–$10), selain itu dilewati.
@@ -43,6 +45,7 @@ PEND_WAIT = 12
 SL_BUF = 0.3
 RISK_MIN, RISK_MAX = 1.0, 10.0
 MAX_TRADES_DAY, MAX_LOSS_DAY = 3, 2
+PB_LOOKBACK = 48           # bar M5 (4 jam) untuk mengukur pullback: high tertinggi → low terendah sesudahnya
 
 
 @dataclass(frozen=True)
@@ -56,11 +59,14 @@ class Cfg:
     be: bool = False
     fallback: str = "market"   # kaki CHoCH tanpa FVG M5: market | level (limit retest level CHoCH) |
                                # half (limit 50% kaki CHoCH) | skip
+    min_pb: float = 0.0        # pullback minimal ke POI (× ATR14 bias TF) saat CHoCH; 0 = mati
+
 
     @property
     def name(self) -> str:
         return (f"{self.bias}_{'pd' if self.pd else 'nopd'}_{'sw' if self.sweep else 'nosw'}_{self.entry}"
-                f"_RR{self.rr:g}_{'ses' if self.session else 'all'}{'_BE' if self.be else ''}")
+                f"_RR{self.rr:g}_{'ses' if self.session else 'all'}{'_BE' if self.be else ''}"
+                f"{f'_pb{self.min_pb:g}' if self.min_pb else ''}")
 
 
 def _htf_index(t5: np.ndarray, htf_index: pd.DatetimeIndex, minutes: int) -> np.ndarray:
@@ -89,6 +95,7 @@ class Market:
         ema = h4["close"].ewm(span=ema_span, adjust=False).mean()
         atr = (h4["high"] - h4["low"]).rolling(14).mean()
         slope = ema.diff(3)
+        self.atr_htf = np.where(valid, atr.to_numpy()[kk], np.nan)
         up = ((h4["close"] > ema) & (slope > min_slope * atr)).to_numpy()
         dn = ((h4["close"] < ema) & (slope < -min_slope * atr)).to_numpy()
         hi20, lo20 = h4["high"].rolling(20).max().shift(1), h4["low"].rolling(20).min().shift(1)
@@ -218,6 +225,12 @@ def run_side(mk: Market, cfg: Cfg, is_buy: bool, block: np.ndarray | None = None
                 continue
             if block is not None and block[i]:
                 continue                        # news: tunda entry
+            if cfg.min_pb:
+                w0 = max(0, i - PB_LOOKBACK)
+                hi_i = w0 + int(np.argmax(H[w0:i + 1]))
+                if not (H[hi_i] - L[hi_i:i + 1].min() >= cfg.min_pb * mk.atr_htf[i]):
+                    state = "idle"              # pullback terlalu dangkal: setup dibuang
+                    continue
             sl = s["low"] - SL_BUF
             if cfg.entry == "fvg":
                 ks = [j for j in range(lo_i + 2, i + 1) if L[j] > H[j - 2]]
