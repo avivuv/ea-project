@@ -23,7 +23,7 @@ echo   TRADING XAUUSD - akun DEMO
 echo ============================================================
 call :status_list
 echo ------------------------------------------------------------
-echo   1. Start semua  (EA sinyal, swing, SMC Top-Down, dashboard)
+echo   1. Start semua  (EA sinyal, swing, SMC Top-Down, ORB NY, dashboard)
 echo   2. Stop semua   (posisi dan pending di MT5 TIDAK ditutup)
 echo   3. Buka dashboard di browser
 echo   4. Refresh status
@@ -63,6 +63,7 @@ echo Pastikan MT5 terbuka dan tombol "Algo Trading" menyala.
 call :launch tg_signal.run_live "EA sinyal" "tg_signal.run_live --mode DEMO"
 call :launch intraday.swing_live "Swing" "intraday.swing_live"
 call :launch tg_signal.pro_live "SMC Top-Down" "tg_signal.pro_live --mode DEMO"
+call :launch tg_signal.orb_live "ORB NY" "tg_signal.orb_live --mode DEMO"
 call :launch tg_signal.dashboard "Dashboard" "tg_signal.dashboard"
 exit /b
 
@@ -79,12 +80,12 @@ exit /b
 
 :do_stop
 powershell -NoProfile -Command "Get-CimInstance Win32_Process -Filter \"Name='cmd.exe'\" | Where-Object { $_.CommandLine -match 'ea-project\\start_\w+\.bat|trading\.bat. run' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }"
-powershell -NoProfile -Command "Get-CimInstance Win32_Process -Filter \"Name='python.exe'\" | Where-Object { $_.CommandLine -match 'tg_signal\.(run_live|pro_live|dashboard)|intraday\.swing_live' } | ForEach-Object { Write-Host ('  stop ' + ($_.CommandLine -split ' -m ')[-1] + '  (PID ' + $_.ProcessId + ')'); Stop-Process -Id $_.ProcessId -Force }"
+powershell -NoProfile -Command "Get-CimInstance Win32_Process -Filter \"Name='python.exe'\" | Where-Object { $_.CommandLine -match 'tg_signal\.(run_live|pro_live|orb_live|dashboard)|intraday\.swing_live' } | ForEach-Object { Write-Host ('  stop ' + ($_.CommandLine -split ' -m ')[-1] + '  (PID ' + $_.ProcessId + ')'); Stop-Process -Id $_.ProcessId -Force }"
 echo   Semua program dihentikan.
 exit /b
 
 :status_list
-powershell -NoProfile -Command "$p = Get-CimInstance Win32_Process -Filter \"Name='python.exe'\"; foreach ($m in @('tg_signal.run_live|EA sinyal Telegram','intraday.swing_live|Swing Donchian','tg_signal.pro_live|SMC Top-Down','tg_signal.dashboard|Dashboard')) { $k,$n = $m.Split('|'); $x = $p | Where-Object { $_.CommandLine -like ('*' + $k + '*') } | Select-Object -First 1; if ($x) { Write-Host ('  [JALAN] ' + $n + '  sejak ' + $x.CreationDate.ToString('dd/MM HH:mm')) -ForegroundColor Green } else { Write-Host ('  [MATI ] ' + $n) -ForegroundColor Red } }"
+powershell -NoProfile -Command "$p = Get-CimInstance Win32_Process -Filter \"Name='python.exe'\"; foreach ($m in @('tg_signal.run_live|EA sinyal Telegram','intraday.swing_live|Swing Donchian','tg_signal.pro_live|SMC Top-Down','tg_signal.orb_live|ORB NY','tg_signal.dashboard|Dashboard')) { $k,$n = $m.Split('|'); $x = $p | Where-Object { $_.CommandLine -like ('*' + $k + '*') } | Select-Object -First 1; if ($x) { Write-Host ('  [JALAN] ' + $n + '  sejak ' + $x.CreationDate.ToString('dd/MM HH:mm')) -ForegroundColor Green } else { Write-Host ('  [MATI ] ' + $n) -ForegroundColor Red } }"
 exit /b
 
 :run

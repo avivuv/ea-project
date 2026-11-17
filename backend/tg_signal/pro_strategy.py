@@ -69,16 +69,20 @@ class Cfg:
                 f"{f'_pb{self.min_pb:g}' if self.min_pb else ''}")
 
 
-def _htf_index(t5: np.ndarray, htf_index: pd.DatetimeIndex, minutes: int) -> np.ndarray:
+def _htf_index(t5: np.ndarray, htf_index: pd.DatetimeIndex, minutes: int, bar_min: int = 5) -> np.ndarray:
     """Untuk tiap bar M5: indeks bar HTF terakhir yang sudah close saat bar M5 itu close."""
     close_htf = (htf_index + pd.Timedelta(minutes=minutes)).values.astype("datetime64[ns]")
-    close_m5 = t5 + np.timedelta64(5, "m")
+    close_m5 = t5 + np.timedelta64(bar_min, "m")
     return np.searchsorted(close_htf, close_m5, side="right") - 1
 
 
 class Market:
-    def __init__(self, df: pd.DataFrame, ema_span: int = 50, bias_tf: int = 240, min_slope: float = 0.0):
-        """min_slope: EMA harus naik/turun > min_slope × ATR14 (bias TF) dalam 3 bar — tren benar-benar bergerak."""
+    def __init__(self, df: pd.DataFrame, ema_span: int = 50, bias_tf: int = 240, min_slope: float = 0.0,
+                 poi_tf: int = 15, bar_min: int = 5):
+        """min_slope: EMA harus naik/turun > min_slope × ATR14 (bias TF) dalam 3 bar — tren benar-benar bergerak.
+        poi_tf / bar_min: timeframe POI dan timeframe bar df (eksekusi). Default M15 / M5; mode scalping mis. M5 / M1
+        (konstanta jumlah bar di run_side tidak diubah → seluruh struktur ikut mengecil)."""
+        self.bar_min = bar_min
         self.df = df
         self.t = df.index.values.astype("datetime64[ns]")
         self.n = len(df)
@@ -89,7 +93,7 @@ class Market:
         self.arr = {True: (o, h, l, c), False: (-o, -l, -h, -c)}
 
         h4 = df.resample(f"{bias_tf}min").agg({"open": "first", "high": "max", "low": "min", "close": "last"}).dropna()
-        k = _htf_index(self.t, h4.index, bias_tf)
+        k = _htf_index(self.t, h4.index, bias_tf, bar_min)
         valid = k >= 0
         kk = np.where(valid, k, 0)
         ema = h4["close"].ewm(span=ema_span, adjust=False).mean()
@@ -113,8 +117,8 @@ class Market:
         m = np.where(valid, mid[kk], np.nan)
         self.mid = {True: m, False: -m}
 
-        m15 = df.resample("15min").agg({"open": "first", "high": "max", "low": "min", "close": "last"}).dropna()
-        to5 = np.searchsorted(self.t, (m15.index + pd.Timedelta(minutes=15)).values.astype("datetime64[ns]"),
+        m15 = df.resample(f"{poi_tf}min").agg({"open": "first", "high": "max", "low": "min", "close": "last"}).dropna()
+        to5 = np.searchsorted(self.t, (m15.index + pd.Timedelta(minutes=poi_tf)).values.astype("datetime64[ns]"),
                               side="left") - 1
         self.pois = {}
         for is_buy in (True, False):

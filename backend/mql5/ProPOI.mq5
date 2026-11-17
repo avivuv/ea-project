@@ -4,13 +4,16 @@
 //| dan menggambar di canvas transparan (ARGB):                       |
 //|   kotak POI M15 (FVG/OB/IFVG), POI "armed" (tunggu CHoCH M5),     |
 //|   garis entry / SL / TP order.                                    |
+//| + area ORB New York (tg_signal/orb_live.py → orb_area.csv):       |
+//|   kotak opening range 15 mnt, garis level breakout, panah         |
+//|   breakout, entry / SL / TP posisi ORB.                           |
 //| Canvas dipakai karena kotak bawaan MT5 tidak bisa transparan dan  |
 //| area yang bertumpuk jadi putih (XOR).                             |
 //| Hanya tampilan — tidak membuka order apa pun.                     |
 //+------------------------------------------------------------------+
 #property copyright   "ea-project"
-#property version     "2.00"
-#property description "Marker POI strategi sendiri: kotak transparan FVG/OB/IFVG M15, POI armed, entry/SL/TP"
+#property version     "2.10"
+#property description "Marker POI strategi sendiri (FVG/OB/IFVG M15, armed, entry/SL/TP) + area ORB New York"
 #property indicator_chart_window
 #property indicator_plots 0
 
@@ -28,6 +31,10 @@ input color  InpEntryColor = C'30,120,255';
 input color  InpSLColor    = C'230,60,60';
 input color  InpTPColor    = C'20,170,60';
 input color  InpTextColor  = C'110,110,110';
+input bool   InpShowOrb    = true;              // tampilkan area ORB New York
+input string InpFileOrb    = "orb_area.csv";    // file ORB di folder Common\Files
+input color  InpOrbColor   = C'150,90,230';     // kotak opening range ORB
+input int    InpOrbHoldMin = 360;               // panjang garis level ORB (menit sejak NY buka)
 
 #define NAME "PROPOI_canvas"
 
@@ -36,10 +43,18 @@ Row     g_rows[];
 CCanvas g_cv;
 int     g_w = 0, g_h = 0;
 
+void ReadAll()
+  {
+   ArrayResize(g_rows, 0);
+   ReadFile(InpFile);
+   if(InpShowOrb)
+      ReadFile(InpFileOrb);
+  }
+
 int OnInit()
   {
    EventSetTimer(5);
-   ReadFile();
+   ReadAll();
    Render();
    return(INIT_SUCCEEDED);
   }
@@ -54,7 +69,7 @@ void OnDeinit(const int reason)
 
 void OnTimer()
   {
-   ReadFile();
+   ReadAll();
    Render();
   }
 
@@ -69,17 +84,16 @@ int OnCalculate(const int rates_total, const int prev_calculated, const int begi
    return(rates_total);
   }
 
-//--- baca file CSV (8 kolom per baris)
-void ReadFile()
+//--- baca file CSV (8 kolom per baris), ditambahkan ke g_rows
+void ReadFile(const string file)
   {
    if(StringFind(_Symbol, "XAUUSD") < 0)
       return;
-   int h = FileOpen(InpFile, FILE_READ | FILE_CSV | FILE_ANSI | FILE_COMMON | FILE_SHARE_READ | FILE_SHARE_WRITE, ',');
+   int h = FileOpen(file, FILE_READ | FILE_CSV | FILE_ANSI | FILE_COMMON | FILE_SHARE_READ | FILE_SHARE_WRITE, ',');
    if(h == INVALID_HANDLE)
       return;
-   ArrayResize(g_rows, 0);
-   int k = 0;
-   while(!FileIsEnding(h) && k < 500)
+   int k = ArraySize(g_rows);
+   while(!FileIsEnding(h) && k < 1000)
      {
       Row r;
       r.rec  = FileReadString(h);
@@ -90,7 +104,8 @@ void ReadFile()
       r.p2   = StringToDouble(FileReadString(h));
       r.p3   = StringToDouble(FileReadString(h));
       r.flag = (int)StringToInteger(FileReadString(h));
-      if(r.rec == "POI" || r.rec == "ARMED" || r.rec == "ORDER")
+      if(r.rec == "POI" || r.rec == "ARMED" || r.rec == "ORDER" || r.rec == "ORB" || r.rec == "ORBBRK" ||
+         r.rec == "ORBORD")
         {
          ArrayResize(g_rows, k + 1);
          g_rows[k++] = r;
@@ -130,6 +145,33 @@ void Label(datetime t, double p, const string txt, color c, uchar a = 255)
    if(!XY(t, p, x, y))
       return;
    g_cv.TextOut(ClampX(x) + 3, y - 13, txt, ColorToARGB(c, a));
+  }
+
+//--- kotak dengan batas waktu kiri-kanan (area ORB)
+void Box2(datetime t1, datetime t2, double lo, double hi, color c, uchar fill_a, uchar line_a)
+  {
+   int x1, y1, x2, y2;
+   if(!XY(t1, hi, x1, y1) || !XY(t2, lo, x2, y2))
+      return;
+   if(x2 < 0 || x1 > g_w - 60)
+      return;
+   x1 = ClampX(x1);
+   x2 = MathMin(ClampX(x2), g_w - 60);
+   if(x2 <= x1)
+      x2 = x1 + 2;
+   g_cv.FillRectangle(x1, y1, x2, y2, ColorToARGB(c, fill_a));
+   g_cv.Rectangle(x1, y1, x2, y2, ColorToARGB(c, line_a));
+  }
+
+//--- garis horizontal terbatas waktu
+void Seg(datetime t1, datetime t2, double p, color c, uchar a)
+  {
+   int x1, y1, x2, y2;
+   if(!XY(t1, p, x1, y1) || !XY(t2, p, x2, y2))
+      return;
+   if(x2 < 0 || x1 > g_w - 60)
+      return;
+   g_cv.LineHorizontal(ClampX(x1), MathMin(ClampX(x2), g_w - 60), y1, ColorToARGB(c, a));
   }
 
 void HLine(datetime t1, double p, color c, const string txt)
@@ -193,6 +235,40 @@ void Render()
          HLine(r.t1, r.p1, InpEntryColor, r.dir + " " + what + " " + DoubleToString(r.p1, _Digits));
          HLine(r.t1, r.p2, InpSLColor, "SL " + DoubleToString(r.p2, _Digits));
          HLine(r.t1, r.p3, InpTPColor, "TP " + DoubleToString(r.p3, _Digits) + " (1:3)");
+        }
+      else if(r.rec == "ORB")
+        {
+         // flag: 0 bentuk range · 1 tunggu breakout · 2 tanpa breakout · 3 breakout → order · 4 bias ✗
+         datetime t_or = r.t1 + 15 * 60;
+         datetime t_hold = r.t1 + InpOrbHoldMin * 60;
+         Box2(r.t1, r.flag == 0 ? (datetime)r.p3 : t_or, r.p1, r.p2, InpOrbColor, InpAlpha,
+              InpBorderAlpha);
+         if(r.flag > 0)
+           {
+            uchar la = (uchar)(r.flag == 1 ? 220 : 120);
+            Seg(t_or, r.flag == 1 ? (datetime)r.p3 : t_hold, r.p2, InpOrbColor, la);
+            Seg(t_or, r.flag == 1 ? (datetime)r.p3 : t_hold, r.p1, InpOrbColor, la);
+           }
+         string st = r.flag == 0 ? "membentuk range" : r.flag == 1 ? "tunggu breakout" :
+                     r.flag == 2 ? "tanpa breakout" : r.flag == 3 ? "breakout" : "breakout, bias tidak searah";
+         Label(r.t1, r.p2, "ORB NY · " + st, InpOrbColor);
+        }
+      else if(r.rec == "ORBBRK")
+        {
+         int x, y;
+         if(XY(r.t1, r.p1, x, y) && x >= 0 && x < g_w - 60)
+           {
+            color c = r.flag == 1 ? (buy ? InpBuyColor : InpSellColor) : InpOffColor;
+            g_cv.TextOut(x, buy ? y + 4 : y - 26, buy ? "▲" : "▼", ColorToARGB(c, 255), TA_CENTER);
+            g_cv.TextOut(x + 8, buy ? y + 6 : y - 24, "ORB " + r.dir + (r.flag == 1 ? "" : " (bias ✗)"),
+                         ColorToARGB(c, 230));
+           }
+        }
+      else if(r.rec == "ORBORD")
+        {
+         HLine(r.t1, r.p1, InpEntryColor, "ORB " + r.dir + " " + DoubleToString(r.p1, _Digits));
+         HLine(r.t1, r.p2, InpSLColor, "ORB SL " + DoubleToString(r.p2, _Digits));
+         HLine(r.t1, r.p3, InpTPColor, "ORB TP " + DoubleToString(r.p3, _Digits) + " (1:2)");
         }
      }
    g_cv.Update();
