@@ -224,6 +224,23 @@ class Store:
         self.conn.execute("UPDATE trades SET tp=? WHERE id=?", (tp, trade_id))
         self.conn.commit()
 
+    def max_report_lines(self, report_date: str) -> int:
+        """Jumlah baris terbanyak di satu pesan Report untuk tanggal itu (laporan kumulatif)."""
+        row = self.conn.execute(
+            """SELECT MAX(n) FROM (SELECT COUNT(*) n FROM report_lines WHERE report_date=?
+               GROUP BY message_id)""", (report_date,)).fetchone()
+        return row[0] or 0
+
+    def signals_matching(self, direction: str, level_first: int, level_last: int | None,
+                         since: datetime, until: datetime) -> list[sqlite3.Row]:
+        """Sinyal arah + level sama yang diterima di [since, until], urut waktu."""
+        q = """SELECT * FROM signals WHERE direction=? AND level_first=? AND received_utc >= ?
+               AND received_utc <= ?""" + (" AND level_last=?" if level_last is not None else "")
+        args = [direction, level_first, utc_iso(since), utc_iso(until)]
+        if level_last is not None:
+            args.append(level_last)
+        return self.conn.execute(q + " ORDER BY received_utc", args).fetchall()
+
     def signal_zero(self, signal_id: int) -> float | None:
         row = self.conn.execute("SELECT zero FROM signals WHERE id=?", (signal_id,)).fetchone()
         return None if row is None else row["zero"]

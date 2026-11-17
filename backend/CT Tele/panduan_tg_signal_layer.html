@@ -1,0 +1,602 @@
+<title>Panduan TG Signal Layer</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap">
+<style>
+/* Layout: kolom bacaan tunggal ~760px, navigasi tab lengket di atas, tabel dan kode menggulir di wadahnya sendiri */
+:root {
+  --bg: #f6f5f1;
+  --surface: #ffffff;
+  --fg: #1d1c19;
+  --muted: #625e55;
+  --line: #e2ded4;
+  --accent: #9a6a00;         /* emas tua, dari dunia XAUUSD */
+  --accent-soft: #f3e7c6;
+  --code-bg: #efece4;
+  --good: #1f7a46;
+  --good-soft: #e1f1e7;
+  --bad: #b23a2b;
+  --bad-soft: #f7e3df;
+  --warn-soft: #fbf0d6;
+  --font-display: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #15140f; --surface: #1d1c16; --fg: #ece8dd; --muted: #a8a294; --line: #34312a;
+    --accent: #e0b44a; --accent-soft: #3a3020; --code-bg: #24221b;
+    --good: #6fcf97; --good-soft: #1b3326; --bad: #f08a7a; --bad-soft: #3a211d; --warn-soft: #362d17;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #15140f; --surface: #1d1c16; --fg: #ece8dd; --muted: #a8a294; --line: #34312a;
+  --accent: #e0b44a; --accent-soft: #3a3020; --code-bg: #24221b;
+  --good: #6fcf97; --good-soft: #1b3326; --bad: #f08a7a; --bad-soft: #3a211d; --warn-soft: #362d17;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--fg);
+  font-family: var(--font-body); font-size: 16px; line-height: 1.6;
+}
+body::before {
+  content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px);
+  z-index: 10; background: var(--bg);
+}
+.wrap {
+  max-width: 800px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+
+header.top { padding-block: 40px 20px; border-bottom: 1px solid var(--line); }
+.eyebrow {
+  font-family: var(--font-mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--accent); margin: 0 0 8px;
+}
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; line-height: 1.2; margin: 0; }
+h1 { font-size: clamp(28px, 5vw, 40px); font-weight: 700; letter-spacing: -.01em; }
+.lede { color: var(--muted); max-width: 62ch; margin: 12px 0 0; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 16px; font-size: 13px; color: var(--muted); }
+.meta span { font-family: var(--font-mono); }
+
+nav.tabs {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5;
+  background: var(--bg); border-bottom: 1px solid var(--line);
+}
+nav.tabs .wrap { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; }
+nav.tabs a {
+  flex: 0 0 auto; padding: 12px 12px 10px; font-size: 14px; font-weight: 500;
+  color: var(--muted); text-decoration: none; border-bottom: 2px solid transparent;
+}
+nav.tabs a:hover { color: var(--fg); }
+nav.tabs a[aria-current="page"] { color: var(--fg); border-bottom-color: var(--accent); }
+nav.tabs a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+main { padding-block: 28px 64px; }
+section.view { display: grid; gap: 22px; }
+h2 { font-size: 24px; font-weight: 600; }
+h3 { font-size: 18px; font-weight: 600; margin-top: 8px; }
+p { margin: 0; max-width: 68ch; }
+ul, ol { margin: 0; padding-left: 22px; display: grid; gap: 6px; max-width: 68ch; }
+strong { font-weight: 600; }
+a { color: var(--accent); }
+code {
+  font-family: var(--font-mono); font-size: .88em; background: var(--code-bg);
+  padding: 1px 5px; border-radius: 4px; word-break: break-word;
+}
+
+.step { display: grid; grid-template-columns: 36px 1fr; gap: 4px 14px; align-items: start; }
+.step .n {
+  width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center;
+  font-family: var(--font-mono); font-size: 13px; font-weight: 500;
+  border: 1.5px solid var(--accent); color: var(--accent);
+}
+.step .body { display: grid; gap: 10px; min-width: 0; }
+.step h3 { margin-top: 3px; }
+
+.code {
+  position: relative; background: var(--code-bg); border-radius: 8px; min-width: 0;
+}
+.code pre {
+  margin: 0; padding: 14px 16px; overflow-x: auto; font-family: var(--font-mono);
+  font-size: 13.5px; line-height: 1.55; tab-size: 4;
+}
+.code button {
+  position: absolute; top: 8px; right: 8px; font: 500 12px var(--font-body);
+  padding: 4px 10px; border-radius: 6px; border: 1px solid var(--line);
+  background: var(--surface); color: var(--fg); cursor: pointer;
+}
+.code button:hover { border-color: var(--accent); }
+
+.table { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-weight: 600; font-size: 12.5px; color: var(--muted); letter-spacing: .02em; background: var(--bg); }
+tr:last-child td { border-bottom: 0; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+td code { white-space: nowrap; }
+
+.note {
+  border-left: 3px solid var(--accent); background: var(--accent-soft);
+  padding: 12px 16px; border-radius: 0 8px 8px 0; display: grid; gap: 6px;
+}
+.note.danger { border-left-color: var(--bad); background: var(--bad-soft); }
+.note.ok { border-left-color: var(--good); background: var(--good-soft); }
+.note p { max-width: none; }
+
+.pill {
+  display: inline-block; font-size: 12px; font-weight: 600; padding: 1px 8px; border-radius: 999px;
+  white-space: nowrap;
+}
+.pill.good { background: var(--good-soft); color: var(--good); }
+.pill.bad { background: var(--bad-soft); color: var(--bad); }
+.pill.run { background: var(--accent-soft); color: var(--accent); }
+.pos { color: var(--good); font-weight: 600; }
+.neg { color: var(--bad); font-weight: 600; }
+
+/* diagram alur */
+.flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; align-items: stretch; }
+.flow .box {
+  border: 1px solid var(--line); background: var(--surface); border-radius: 8px;
+  padding: 12px; display: grid; gap: 4px; position: relative; min-width: 0;
+}
+.flow .box b { font-family: var(--font-display); font-size: 15px; font-weight: 600; }
+.flow .box small { color: var(--muted); font-size: 13px; line-height: 1.45; }
+.flow .box .tag { font-family: var(--font-mono); font-size: 11px; color: var(--accent); letter-spacing: .05em; }
+@media (max-width: 640px) { .flow { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 400px) { .flow { grid-template-columns: 1fr; } }
+
+.ladder { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.ladder .acct { border: 1px solid var(--line); border-radius: 8px; background: var(--surface); padding: 14px; display: grid; gap: 8px; }
+.ladder .acct h3 { margin: 0; font-size: 16px; }
+.ladder .row { display: flex; justify-content: space-between; gap: 8px; font-size: 14px; border-top: 1px dashed var(--line); padding-top: 6px; }
+.ladder .row span:last-child { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+hr { border: 0; border-top: 1px solid var(--line); margin: 6px 0; }
+footer { color: var(--muted); font-size: 13px; padding-block: 0 40px; }
+
+@media (prefers-reduced-motion: no-preference) {
+  section.view { animation: fade .18s ease-out; }
+  @keyframes fade { from { opacity: .4; } to { opacity: 1; } }
+}
+</style>
+
+<header class="top">
+  <div class="wrap">
+    <p class="eyebrow">MT4 · XAUUSD · Sinyal Telegram</p>
+    <h1>Panduan TG Signal Layer</h1>
+    <p class="lede">Sistem yang membaca sinyal zona dari grup Telegram, lalu mengeksekusinya otomatis di MetaTrader 4 dengan SL, kunci profit, dan trailing. Panduan ini mencakup instalasi, setting EA, hasil backtest, dan cara mengambil riwayat sinyal.</p>
+    <div class="meta">
+      <div>Versi EA <span>v1.11</span> (uji demo) · <span>v1.31</span> (rejection + dashboard)</div>
+      <div>Pembaca sinyal <span>v1.1</span></div>
+      <div>Diperbarui <span>11 Nov 2026</span></div>
+    </div>
+  </div>
+</header>
+
+<nav class="tabs" aria-label="Bagian panduan">
+  <div class="wrap">
+    <a href="#ringkasan">Ringkasan</a>
+    <a href="#instalasi">Instalasi</a>
+    <a href="#setting">Setting EA</a>
+    <a href="#backtest">Hasil backtest</a>
+    <a href="#history">Ambil history</a>
+    <a href="#masalah">Masalah umum</a>
+  </div>
+</nav>
+
+<main class="wrap">
+
+<!-- ============================ RINGKASAN ============================ -->
+<section class="view" id="v-ringkasan">
+  <h2>Cara kerja sistem</h2>
+  <p>Sistem ini punya dua bagian yang berjalan di VPS yang sama: <strong>pembaca sinyal</strong> (script Python) dan <strong>EA</strong> di MT4. Keduanya berkomunikasi lewat satu file teks.</p>
+
+  <div class="flow" role="list">
+    <div class="box" role="listitem"><span class="tag">1 · TELEGRAM</span><b>Grup sinyal</b><small>Admin mengirim <code>SELL 62-66</code> atau <code>BUY 47-43</code>.</small></div>
+    <div class="box" role="listitem"><span class="tag">2 · PYTHON</span><b>Pembaca sinyal</b><small>Membaca pesan baru, mengabaikan rekap dan obrolan, cek cadangan tiap 15 detik.</small></div>
+    <div class="box" role="listitem"><span class="tag">3 · FILE</span><b>tg_signals.txt</b><small>Di folder <code>Common\Files</code>, dipakai bersama semua MT4 di VPS.</small></div>
+    <div class="box" role="listitem"><span class="tag">4 · MT4</span><b>EA TG Signal Layer</b><small>Melengkapi harga zona, memasang order, mengelola SL dan trailing.</small></div>
+  </div>
+
+  <h3>Yang dilakukan EA saat sinyal zona masuk</h3>
+  <ul>
+    <li><strong>Melengkapi harga.</strong> Sinyal hanya menulis dua digit terakhir. <code>SELL 62-66</code> saat harga 4060 menjadi zona 4062–4066. Titik pertama (4062) disebut <strong>ZERO</strong>, titik terakhir (4066) disebut <strong>LAST</strong>.</li>
+    <li><strong>Harga belum sampai ZERO:</strong> EA memasang pending (sell limit / buy limit) di ZERO.</li>
+    <li><strong>Harga sudah melewati ZERO tapi masih di zona:</strong> EA langsung entry market. Dari backtest, entry seperti ini justru menyumbang profit.</li>
+    <li><strong>Harga sudah menembus LAST lebih dari 5 pips:</strong> sinyal diabaikan.</li>
+    <li><strong>Pesan "Buy Now / Sell Now":</strong> diabaikan. Pesan ini selalu disusul sinyal zona sekitar 24 detik kemudian.</li>
+    <li>Pending yang tidak tersentuh <strong>60 menit</strong> dihapus. Maksimal <strong>3 sinyal</strong> aktif bersamaan. Posisi berlawanan boleh berjalan bersamaan, masing-masing dengan SL dan TP sendiri.</li>
+  </ul>
+
+  <h3>Status pengujian</h3>
+  <div class="ladder">
+    <div class="acct">
+      <h3>Akun demo 1 <span class="pill run">berjalan</span></h3>
+      <div class="row"><span>Entry</span><span>Pending ZERO</span></div>
+      <div class="row"><span>TP</span><span>30 pips</span></div>
+      <div class="row"><span>Kunci profit</span><span>+10 → +5</span></div>
+      <div class="row"><span>Trailing</span><span>mulai +15, jarak 5</span></div>
+    </div>
+    <div class="acct">
+      <h3>Akun demo 2 <span class="pill run">berjalan</span></h3>
+      <div class="row"><span>Entry</span><span>Pending ZERO</span></div>
+      <div class="row"><span>TP</span><span>100 pips</span></div>
+      <div class="row"><span>Kunci profit</span><span>+10 → +5</span></div>
+      <div class="row"><span>Trailing</span><span>mulai +40, jarak 20</span></div>
+    </div>
+  </div>
+  <ol>
+    <li><strong>Sampai sekitar 25 November:</strong> akun 1 dibandingkan dengan akun 2.</li>
+    <li><strong>Setelah itu:</strong> akun yang kalah diganti dengan kandidat 3 (filter EMA), lalu kandidat 2 (rejection candle M5).</li>
+    <li>Di akhir tiap putaran, ekspor <strong>Account History</strong> kedua akun (klik kanan → <em>Save as Report</em>) untuk dibandingkan dengan backtest.</li>
+  </ol>
+
+  <div class="note danger">
+    <p><strong>Jangan langsung ke akun real.</strong> Semua angka di panduan ini berasal dari backtest 30 hari dan uji demo yang masih berjalan. Hasil masa lalu tidak menjamin hasil berikutnya.</p>
+  </div>
+</section>
+
+<!-- ============================ INSTALASI ============================ -->
+<section class="view" id="v-instalasi" hidden>
+  <h2>Instalasi di VPS</h2>
+  <p>Semua langkah dikerjakan di VPS Windows yang menjalankan MT4 Exness. Langkah 1 dan 2 khusus untuk <strong>Windows Server 2012 R2</strong>; di Windows 10/11 cukup install Python versi terbaru.</p>
+
+  <div class="table">
+    <table>
+      <thead><tr><th>File</th><th>Fungsi</th></tr></thead>
+      <tbody>
+        <tr><td><code>tg_signal_reader.py</code></td><td>Pembaca sinyal Telegram (v1.1)</td></tr>
+        <tr><td><code>run_reader.bat</code></td><td>Menjalankan pembaca terus-menerus, restart otomatis kalau berhenti. Dibuat manual (langkah 6).</td></tr>
+        <tr><td><code>TG_Signal_Layer.mq4</code></td><td>EA v1.11, dipakai di akun demo 1 dan 2</td></tr>
+        <tr><td><code>TG_Signal_Layer_v131.mq4</code></td><td>EA v1.31: mode rejection candle, filter EMA, dashboard di chart</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="step"><div class="n">1</div><div class="body">
+    <h3>Pasang Universal C Runtime</h3>
+    <p>Tanpa komponen ini, installer Python gagal dengan error <code>0x80070643</code>.</p>
+    <ol>
+      <li>Buka <strong>catalog.update.microsoft.com</strong>, cari <code>KB3118401</code>.</li>
+      <li>Download baris <strong>Update for Windows Server 2012 R2 (KB3118401)</strong>, sekitar 992 KB.</li>
+      <li>Jalankan file <code>.msu</code>, lalu restart VPS.</li>
+    </ol>
+  </div></div>
+
+  <div class="step"><div class="n">2</div><div class="body">
+    <h3>Install Python 3.11.9</h3>
+    <p>Python 3.12 ke atas tidak mendukung Server 2012 R2. Download <strong>Windows installer (64-bit)</strong> dari python.org/downloads/release/python-3119/.</p>
+    <ol>
+      <li>Klik kanan installer → <strong>Run as administrator</strong>.</li>
+      <li>Centang <strong>Add python.exe to PATH</strong>, lalu Install Now.</li>
+      <li>Buka Command Prompt baru, jalankan:</li>
+    </ol>
+    <div class="code"><pre>pip install telethon</pre></div>
+  </div></div>
+
+  <div class="step"><div class="n">3</div><div class="body">
+    <h3>Ambil API Telegram</h3>
+    <p>Login di <strong>my.telegram.org</strong> → <strong>API development tools</strong>. Isi App title dan Short name (huruf dan angka, 5–32 karakter), Platform pilih Desktop. Catat <strong>api_id</strong> (angka) dan <strong>api_hash</strong> (huruf-angka panjang).</p>
+    <div class="note danger"><p>Jangan bagikan <code>api_hash</code> dan file <code>tg_signal.session</code> ke siapa pun. Keduanya sama dengan akses ke akun Telegram.</p></div>
+  </div></div>
+
+  <div class="step"><div class="n">4</div><div class="body">
+    <h3>Siapkan script</h3>
+    <p>Buat folder <code>C:\tgbridge</code>, taruh <code>tg_signal_reader.py</code> di sana, lalu edit dengan Notepad. <strong>API_HASH wajib pakai tanda kutip</strong>, API_ID tidak.</p>
+    <div class="code"><pre>API_ID = 12345678
+API_HASH = "isi_api_hash_anda"
+CHAT_ID = -100xxxxxxxxxx</pre></div>
+  </div></div>
+
+  <div class="step"><div class="n">5</div><div class="body">
+    <h3>Login dan cari ID grup</h3>
+    <div class="code"><pre>cd C:\tgbridge
+python tg_signal_reader.py --list</pre></div>
+    <ul>
+      <li>Masukkan nomor HP format internasional tanpa spasi, misalnya <code>+6281234567890</code>.</li>
+      <li>Kode login masuk sebagai <strong>chat dari akun "Telegram"</strong> di aplikasi, bukan SMS.</li>
+      <li>Salin ID grup sinyal (berawalan <code>-100</code>) ke <code>CHAT_ID</code>, lalu simpan.</li>
+    </ul>
+    <p>Dua peringatan <em>Failed to load SSL library</em> dan <em>cryptg module not installed</em> boleh diabaikan.</p>
+  </div></div>
+
+  <div class="step"><div class="n">6</div><div class="body">
+    <h3>Buat run_reader.bat dan jalankan</h3>
+    <p>Browser sering memblokir download <code>.bat</code>, jadi buat sendiri di Notepad, lalu <strong>Save As</strong> ke <code>C:\tgbridge</code> dengan <strong>Save as type: All Files</strong> dan nama <code>run_reader.bat</code>.</p>
+    <div class="code"><pre>@echo off
+title TG Signal Reader
+cd /d %~dp0
+:loop
+python tg_signal_reader.py
+echo.
+echo Pembaca sinyal berhenti. Restart otomatis dalam 10 detik...
+timeout /t 10 /nobreak &gt;nul
+goto loop</pre></div>
+    <p>Klik dua kali <code>run_reader.bat</code>. Tanda pembaca bekerja:</p>
+    <ul>
+      <li><code>Memantau grup: …</code> saat start, menandakan CHAT_ID benar.</li>
+      <li><code>SINYAL | …</code> untuk sinyal, <code>abaikan | …</code> untuk rekap dan obrolan. <code>SINYAL (p)</code> berarti tertangkap lewat cek cadangan.</li>
+      <li><code>masih aktif | …</code> setiap 30 menit.</li>
+    </ul>
+    <div class="note"><p><strong>Auto-start setelah VPS restart:</strong> tekan <code>Win + R</code>, ketik <code>shell:startup</code>, lalu taruh shortcut <code>run_reader.bat</code> di folder itu. Tanpa ini, pembaca sinyal mati diam-diam setiap VPS restart.</p></div>
+  </div></div>
+
+  <div class="step"><div class="n">7</div><div class="body">
+    <h3>Pasang EA di MT4</h3>
+    <ol>
+      <li>MT4 → <strong>File → Open Data Folder → MQL4 → Experts</strong>, salin file EA.</li>
+      <li><strong>F4</strong> (MetaEditor), buka file, <strong>F7</strong> (Compile). Harus 0 error.</li>
+      <li>Buka chart <strong>XAUUSD</strong> baru. Satu chart hanya bisa menjalankan satu EA, jadi jangan pakai chart EA lain.</li>
+      <li>Seret EA ke chart, centang <strong>Allow live trading</strong>, isi tab Inputs (lihat <a href="#setting">Setting EA</a>).</li>
+      <li>Tombol <strong>AutoTrading</strong> hijau, dan tab Experts menampilkan <code>TG Signal Layer aktif di XAUUSD</code>.</li>
+    </ol>
+    <div class="note">
+      <p><strong>Dua akun demo, satu pembaca.</strong> Pakai dua instalasi MT4 terpisah (satu MT4 hanya bisa login satu akun). Keduanya membaca file sinyal yang sama, jadi cukup satu jendela pembaca sinyal.</p>
+      <p>Jangan pasang EA ini di MT4 akun lain, karena akun itu juga akan ikut mengeksekusi semua sinyal.</p>
+    </div>
+  </div></div>
+</section>
+
+<!-- ============================ SETTING ============================ -->
+<section class="view" id="v-setting" hidden>
+  <h2>Setting EA</h2>
+  <p>Semua setting diubah lewat <strong>F7 → tab Inputs</strong> di chart. Teks di kolom kiri dialog hanya label; yang dipakai EA adalah angka di kolom <em>Value</em>.</p>
+
+  <h3>Akun demo 1 dan 2 (EA v1.11)</h3>
+  <div class="table">
+    <table>
+      <thead><tr><th>Input</th><th>Akun 1</th><th>Akun 2</th><th>Arti</th></tr></thead>
+      <tbody>
+        <tr><td><code>IgnoreNowSignals</code></td><td>true</td><td>true</td><td>Abaikan Buy/Sell Now</td></tr>
+        <tr><td><code>LayerLot</code></td><td>0.01</td><td>0.01</td><td>Lot per entry</td></tr>
+        <tr><td><code>UseLayers</code></td><td>Z</td><td>Z</td><td>Hanya titik ZERO (1 entry per sinyal)</td></tr>
+        <tr><td><code>DefaultSLPips</code></td><td>30</td><td>30</td><td>Jarak SL dari harga entry</td></tr>
+        <tr><td><code>SLFromZoneEnd</code></td><td>false</td><td>false</td><td>SL dihitung dari entry, bukan dari ujung zona</td></tr>
+        <tr><td><code>MaxTPPips</code></td><td><strong>30</strong></td><td><strong>100</strong></td><td>Take profit</td></tr>
+        <tr><td><code>BEStartPips</code> / <code>BEOffsetPips</code></td><td>10 / 5</td><td>10 / 5</td><td>Saat +10 pips, SL dikunci di +5</td></tr>
+        <tr><td><code>TrailStartPips</code></td><td><strong>15</strong></td><td><strong>40</strong></td><td>Mulai trailing</td></tr>
+        <tr><td><code>TrailLockPips</code></td><td><strong>10</strong></td><td><strong>20</strong></td><td>SL pertama saat trailing mulai</td></tr>
+        <tr><td><code>TrailStepPips</code></td><td>5</td><td>5</td><td>Setiap naik 5 pips, SL ikut naik 5</td></tr>
+        <tr><td><code>PendingExpiryMin</code></td><td>60</td><td>60</td><td>Pending dihapus setelah 60 menit</td></tr>
+        <tr><td><code>MaxSignalAgeSec</code></td><td>90</td><td>90</td><td>Sinyal yang terlambat lebih dari 90 detik diabaikan</td></tr>
+        <tr><td><code>MaxActiveSignals</code></td><td>3</td><td>3</td><td>Batas sinyal berjalan bersamaan</td></tr>
+        <tr><td><code>MagicNumber</code></td><td>770301</td><td>770301</td><td>Harus beda dengan EA lain di akun yang sama</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Contoh perjalanan satu posisi SELL di 4062 (pip = 0,10)</h3>
+  <div class="table">
+    <table>
+      <thead><tr><th>Profit</th><th>SL akun 1</th><th>SL akun 2</th></tr></thead>
+      <tbody>
+        <tr><td>Entry</td><td>4065 (−30)</td><td>4065 (−30)</td></tr>
+        <tr><td>+10 pips</td><td>4061,5 (+5)</td><td>4061,5 (+5)</td></tr>
+        <tr><td>+15 pips</td><td>4061 (+10)</td><td>4061,5 (+5)</td></tr>
+        <tr><td>+25 pips</td><td>4060 (+20)</td><td>4061,5 (+5)</td></tr>
+        <tr><td>+30 pips</td><td>TP kena</td><td>4061,5 (+5)</td></tr>
+        <tr><td>+40 pips</td><td>–</td><td>4060 (+20)</td></tr>
+        <tr><td>+60 pips</td><td>–</td><td>4058 (+40)</td></tr>
+        <tr><td>+100 pips</td><td>–</td><td>TP kena</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Tiga kandidat untuk putaran uji berikutnya (EA v1.31)</h3>
+  <p>EA v1.31 memakai nama file berbeda supaya tidak menimpa EA yang sedang diuji. Kalau file EA yang sedang jalan di-compile ulang, MT4 memuat ulang EA itu.</p>
+  <div class="table">
+    <table>
+      <thead><tr><th>Input</th><th>Kandidat 1</th><th>Kandidat 2</th><th>Kandidat 3</th></tr></thead>
+      <tbody>
+        <tr><td>Nama</td><td>Pending ZERO<br><small>(= akun 2)</small></td><td>Rejection M5</td><td>EMA 50 M15</td></tr>
+        <tr><td><code>EntryMode</code></td><td>Pending</td><td><strong>Rejection</strong></td><td>Pending</td></tr>
+        <tr><td><code>RejectTF</code></td><td>–</td><td>M5</td><td>–</td></tr>
+        <tr><td><code>SLFromWick</code></td><td>–</td><td>true</td><td>–</td></tr>
+        <tr><td><code>UseEMAFilter</code></td><td>false</td><td>false</td><td><strong>true</strong></td></tr>
+        <tr><td><code>EMAPeriod</code> / <code>EMATF</code></td><td>–</td><td>–</td><td>50 / M15</td></tr>
+        <tr><td>TP / kunci / trailing</td><td colspan="3">TP 100 · +10 → +5 · mulai +40, kunci +20, naik tiap 5</td></tr>
+        <tr><td>Lot / layer / SL</td><td colspan="3">0.01 · Z · SL 30 dari entry (kandidat 2: SL di ujung ekor)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Cara kerja mode tunggu (kandidat 2 dan 3)</h3>
+  <ul>
+    <li>EA tidak memasang pending, tetapi menunggu di memori. Tab Experts mencatat <code>menunggu harga masuk zona</code>.</li>
+    <li><strong>Kandidat 2:</strong> setiap candle M5 close, EA mengecek rejection candle: ekor menyentuh ZERO lalu close kembali keluar zona, ekor ≥ 2× body dan ≥ 50% panjang candle, ekor sisi lain ≤ 25%, panjang candle minimal 10 pips. Kalau ada, entry market dengan SL di ujung ekor + 3 pips (dibatasi 10–40 pips). Kalau candle M5 close menembus LAST lebih dari 5 pips sebelum rejection, sinyal batal.</li>
+    <li><strong>Kandidat 3:</strong> setelah harga menyentuh ZERO, selama harga masih di zona EA mengecek EMA 50 M15 (candle M15 terakhir yang sudah close). SELL hanya kalau close di bawah EMA, BUY hanya kalau di atas. Kalau searah, entry market.</li>
+    <li>Tidak ada entry dalam 60 menit, sinyal batal. Sinyal yang sedang ditunggu hilang kalau MT4 di-restart.</li>
+  </ul>
+
+  <h3>Dashboard di chart (v1.31)</h3>
+  <p>Panel di pojok kiri atas chart, diperbarui tiap detik, jam dalam WITA. Matikan dengan <code>ShowDashboard = false</code>.</p>
+  <ul>
+    <li>Mode, lot, TP, status AutoTrading, spread, dan sinyal terakhir. Baris sinyal berubah oranye kalau lebih dari 2 jam tanpa sinyal baru, tanda pembaca mungkin mati.</li>
+    <li>Balance, equity, floating, hasil hari ini (TP / kunci profit / SL), total, dan max drawdown sejak EA aktif.</li>
+    <li>Daftar posisi, pending, dan sinyal yang sedang ditunggu, plus 6 kejadian terakhir.</li>
+  </ul>
+</section>
+
+<!-- ============================ BACKTEST ============================ -->
+<section class="view" id="v-backtest" hidden>
+  <h2>Hasil backtest</h2>
+  <p>Periode <strong>12 Oktober – 10 November 2026</strong> (22 hari trading), 719 sinyal zona, data harga M1 XAUUSD, spread 0,8 pips, lot 0,01.</p>
+  <div class="note">
+    <p>Setiap hasil ditulis sebagai dua angka. <strong>Terburuk</strong> menganggap SL selalu kena lebih dulu di dalam candle M1. <strong>MT4</strong> memakai jalur harga di dalam candle seperti Strategy Tester MT4. Hasil nyata kemungkinan di antara keduanya.</p>
+  </div>
+
+  <h3>Kandidat yang akan diuji di demo</h3>
+  <div class="table">
+    <table>
+      <thead><tr><th>Setting</th><th class="num">Entry</th><th class="num">P/L terburuk</th><th class="num">P/L MT4</th><th class="num">Max drawdown</th><th class="num">Paruh 1 / 2 (terburuk)</th></tr></thead>
+      <tbody>
+        <tr><td>Akun 1 (TP 30, trailing per 5)</td><td class="num">656</td><td class="num pos">+$19</td><td class="num pos">+$156</td><td class="num">$28–40</td><td class="num">+$18 / +$1</td></tr>
+        <tr><td><strong>Kandidat 1</strong> = akun 2 (TP 100, trailing mulai +40)</td><td class="num">656</td><td class="num pos">+$132</td><td class="num pos">+$223</td><td class="num">$35–42</td><td class="num">+$63 / +$69</td></tr>
+        <tr><td><strong>Kandidat 2</strong> rejection M5, SL di ekor</td><td class="num">98</td><td class="num pos">+$52</td><td class="num pos">+$63</td><td class="num">$11–12</td><td class="num">+$14 / +$39</td></tr>
+        <tr><td><strong>Kandidat 3</strong> EMA 50 M15 di zona</td><td class="num">326</td><td class="num pos">+$114</td><td class="num pos">+$151</td><td class="num">$21–28</td><td class="num">+$44 / +$70</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <ul>
+    <li><strong>Kandidat 1</strong> punya profit total terbesar dan stabil di kedua paruh periode.</li>
+    <li><strong>Kandidat 2</strong> paling efisien: drawdown terkecil, tapi entry jarang (sekitar 4–5 per hari) dan sampelnya kecil.</li>
+    <li><strong>Kandidat 3</strong> menyaring sekitar separuh sinyal dengan drawdown lebih kecil dari kandidat 1.</li>
+    <li>Yang membuat sinyal ini menguntungkan adalah aturan <strong>kunci +5 saat profit +10</strong>. Tanpa aturan itu, hampir semua variasi impas atau rugi.</li>
+  </ul>
+
+  <h3>Sudah diuji, tidak dipakai</h3>
+  <div class="table">
+    <table>
+      <thead><tr><th>Ide</th><th>Hasil</th><th>Alasan</th></tr></thead>
+      <tbody>
+        <tr><td>TP tetap 10 / 20 / 30 tanpa trailing</td><td><span class="pill bad">lebih buruk</span></td><td>TP 10 dengan SL 30 butuh winrate &gt; 75% untuk impas. Terbaik TP 20: +$31 (terburuk).</td></tr>
+        <tr><td>Entry di pesan Buy/Sell Now</td><td><span class="pill bad">lebih buruk</span></td><td>Harga entry lebih jelek. Skenario terburuk −$54, drawdown sampai $114.</td></tr>
+        <tr><td>Engulfing M1 setelah masuk zona</td><td><span class="pill bad">diganti</span></td><td>+$126, tapi hampir semua profit dari paruh pertama (+$111 / +$15). Diganti rejection M5.</td></tr>
+        <tr><td>Rejection candle M1</td><td><span class="pill bad">lebih buruk</span></td><td>Terlalu banyak noise di M1, hasil sekitar impas.</td></tr>
+        <tr><td>Filter jam</td><td><span class="pill bad">tidak membantu</span></td><td>Diuji di paruh kedua (data yang tidak dipakai memilih jam): profit tidak naik.</td></tr>
+        <tr><td>Entry market langsung saat EMA sesuai</td><td><span class="pill bad">lebih buruk</span></td><td>Tanpa menunggu zona, harga entry jelek: +$27 (terburuk).</td></tr>
+        <tr><td>TP parsial (0,02 lot, separuh ditutup di +20)</td><td><span class="pill bad">lebih buruk</span></td><td>Memotong trade yang sedang bagus, tidak menolong trade yang kalah.</td></tr>
+        <tr><td>Tutup posisi lama saat order lawan terisi</td><td><span class="pill bad">lebih buruk</span></td><td>Posisi yang ditutup biasanya sudah terkunci profit. Akun 2 turun dari +$132 ke +$106.</td></tr>
+        <tr><td>Lewati sinyal kalau harga sudah lewat ZERO</td><td><span class="pill bad">lebih buruk</span></td><td>Entry di dalam zona menyumbang profit. Akun 2 turun dari +$132 ke +$91.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Catatan tentang rekap grup</h3>
+  <p>Grup mencatat sekitar 93% TP. Dengan aturan nyata, winrate tertinggi yang bisa didapat sekitar 72–75% (TP 10). Rekap grup menghitung sinyal sebagai TP kalau <em>salah satu</em> dari tiga titik entry kena TP, dengan TP bebas 10/20/30, dan mencatat SL hanya kalau titik LAST kena SL.</p>
+</section>
+
+<!-- ============================ HISTORY ============================ -->
+<section class="view" id="v-history" hidden>
+  <h2>Ambil riwayat sinyal untuk backtest</h2>
+  <p>Mengekspor sinyal dari grup Telegram lengkap dengan jam kirimnya ke file <code>signals_history.csv</code>. Bisa dikerjakan di VPS atau di laptop biasa; login Telegram sama saja dari komputer mana pun.</p>
+
+  <div class="step"><div class="n">1</div><div class="body">
+    <h3>Siapkan pembaca sinyal</h3>
+    <p>Ikuti langkah 1–5 di tab <a href="#instalasi">Instalasi</a>. Di laptop Windows 10/11 langkah 1 tidak perlu, dan Python versi terbaru boleh dipakai.</p>
+  </div></div>
+
+  <div class="step"><div class="n">2</div><div class="body">
+    <h3>Ekspor riwayat</h3>
+    <div class="code"><pre>cd C:\tgbridge
+python tg_signal_reader.py --history 30</pre></div>
+    <ul>
+      <li><code>30</code> artinya 30 hari ke belakang. Bisa diganti <code>60</code> atau <code>90</code> untuk menguji periode lain.</li>
+      <li>Hasilnya <code>signals_history.csv</code> di folder yang sama. Rekap harian, pesan "TP yaa", dan obrolan tidak ikut.</li>
+    </ul>
+  </div></div>
+
+  <div class="step"><div class="n">3</div><div class="body">
+    <h3>Ambil data harga M1 (kalau periodenya baru)</h3>
+    <p>History Center (F2) sering berisi data lama. Pakai script <code>ExportM1.mq4</code>, yang membaca data langsung dari chart:</p>
+    <ol>
+      <li>Taruh <code>ExportM1.mq4</code> di <strong>MQL4 → Scripts</strong>, compile dengan F7.</li>
+      <li>Buka chart XAUUSD <strong>M1</strong>, tekan <strong>Home</strong> beberapa kali sampai periode yang dibutuhkan termuat.</li>
+      <li>Navigator → Scripts → seret <strong>ExportM1</strong> ke chart, isi jumlah hari.</li>
+      <li>File <code>XAUUSD_M1.csv</code> muncul di <strong>Common\Files</strong> (File → Open Data Folder, naik satu folder, lalu Common → Files).</li>
+    </ol>
+  </div></div>
+
+  <div class="step"><div class="n">4</div><div class="body">
+    <h3>Kirim untuk dianalisis</h3>
+    <p>Kirim <code>signals_history.csv</code> dan, kalau ada, <code>XAUUSD_M1.csv</code>. Jangan kirim file <code>tg_signal.session</code> atau api_hash.</p>
+  </div></div>
+</section>
+
+<!-- ============================ MASALAH ============================ -->
+<section class="view" id="v-masalah" hidden>
+  <h2>Masalah umum</h2>
+  <p>Hampir semua masalah bisa ditelusuri dari tiga tempat: jendela <strong>TG Signal Reader</strong>, file <code>tg_signals.txt</code> di <code>Common\Files</code>, dan tab <strong>Experts</strong> di MT4.</p>
+
+  <h3>Instalasi</h3>
+  <div class="table">
+    <table>
+      <thead><tr><th>Gejala</th><th>Solusi</th></tr></thead>
+      <tbody>
+        <tr><td>Setup Python gagal <code>0x80070643</code></td><td>Pasang KB3118401, restart, install ulang Python 3.11 dengan Run as administrator.</td></tr>
+        <tr><td><code>'python' is not recognized</code></td><td>PATH belum tercentang. Install ulang dan centang Add python.exe to PATH.</td></tr>
+        <tr><td><code>NameError: name '…' is not defined</code></td><td>API_HASH belum diapit tanda kutip.</td></tr>
+        <tr><td>Isi script menyambung di Notepad</td><td>Pakai file script versi terbaru (format baris Windows).</td></tr>
+        <tr><td>Kode OTP tidak datang</td><td>Cek chat dari akun "Telegram" (juga di Archived Chats), cek format nomor <code>+62…</code> tanpa angka 0. Tunggu 2–3 menit sebelum mencoba lagi.</td></tr>
+        <tr><td><code>run_reader.bat</code> tidak bisa didownload</td><td>Buat manual di Notepad (Instalasi langkah 6).</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Saat berjalan</h3>
+  <div class="table">
+    <table>
+      <thead><tr><th>Gejala / pesan</th><th>Artinya</th></tr></thead>
+      <tbody>
+        <tr><td>Jendela pembaca sinyal hilang</td><td>VPS restart. Jalankan lagi <code>run_reader.bat</code> dan pasang shortcut di <code>shell:startup</code>.</td></tr>
+        <tr><td>Pembaca menulis <code>SINYAL</code> tapi EA diam</td><td>Cek tab Experts untuk pesan "diabaikan", AutoTrading hijau, EA tersenyum di chart.</td></tr>
+        <tr><td><code>diabaikan: sinyal sudah X detik</code></td><td>Jam VPS tidak sinkron. Control Panel → Date and Time → Internet Time → Update now.</td></tr>
+        <tr><td><code>diabaikan: harga sudah menembus zona</code></td><td>Harga sudah lewat LAST lebih dari 5 pips saat sinyal masuk. Disengaja.</td></tr>
+        <tr><td><code>diabaikan: sudah 3 sinyal aktif</code></td><td>Batas MaxActiveSignals tercapai. Sudah ikut terhitung di backtest.</td></tr>
+        <tr><td><code>SELL NOW diabaikan</code></td><td>Normal. EA menunggu sinyal zona yang menyusul.</td></tr>
+        <tr><td>Entry market, bukan pending</td><td>Harga sudah melewati ZERO saat sinyal masuk, sehingga pending tidak bisa dipasang.</td></tr>
+        <tr><td>Posisi tertutup +$0,50</td><td>Harga sempat +10 pips lalu balik ke SL yang dikunci di +5.</td></tr>
+        <tr><td><code>sinyal terakhir id 0</code> saat EA baru dipasang</td><td>Normal kalau file sinyal belum ada. Sinyal berikutnya langsung diproses.</td></tr>
+        <tr><td>Ingin EA mulai dari nol</td><td>F3 di MT4, hapus variabel <code>TGSL_LastId_770301</code>.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note ok">
+    <p><strong>Cek cepat semuanya sehat:</strong> jendela pembaca menampilkan <code>masih aktif</code> dalam 30 menit terakhir, AutoTrading hijau di setiap MT4 uji, dan setiap sinyal baru muncul sebagai baris <code>TG…</code> di tab Experts semua akun uji.</p>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <hr>
+    <p>Panduan pribadi untuk uji demo. Bukan saran keuangan. Trading emas berisiko tinggi; gunakan hanya dana yang siap hilang.</p>
+  </div>
+</footer>
+
+<script>
+(function () {
+  var views = ["ringkasan", "instalasi", "setting", "backtest", "history", "masalah"];
+  function show() {
+    var h = (location.hash || "").replace("#", "");
+    if (views.indexOf(h) < 0) h = "ringkasan";
+    views.forEach(function (v) {
+      var el = document.getElementById("v-" + v);
+      if (el) el.hidden = (v !== h);
+    });
+    document.querySelectorAll("nav.tabs a").forEach(function (a) {
+      if (a.getAttribute("href") === "#" + h) a.setAttribute("aria-current", "page");
+      else a.removeAttribute("aria-current");
+    });
+  }
+  window.addEventListener("hashchange", function () { show(); window.scrollTo(0, 0); });
+  show();
+
+  document.querySelectorAll(".code").forEach(function (box) {
+    var pre = box.querySelector("pre");
+    var b = document.createElement("button");
+    b.type = "button"; b.textContent = "Salin";
+    b.addEventListener("click", function () {
+      var text = pre.innerText;
+      var done = function () { b.textContent = "Tersalin"; setTimeout(function () { b.textContent = "Salin"; }, 1500); };
+      try {
+        navigator.clipboard.writeText(text).then(done, function () { selectPre(); });
+      } catch (e) { selectPre(); }
+      function selectPre() {
+        var r = document.createRange(); r.selectNodeContents(pre);
+        var s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+        b.textContent = "Tekan Ctrl+C";
+      }
+    });
+    box.appendChild(b);
+  });
+})();
+</script>

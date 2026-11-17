@@ -73,7 +73,7 @@ Level 3 digit = typo → `n % 100` + flag `LEVEL_TYPO`.
 | Lebar zona 1–10 (normalnya 4) | flag `ZONE_WIDTH_SUSPECT` |
 | Jarak zona dari harga sekarang ≤ `TG_MAX_ZONE_DISTANCE` ($15) | status `REJECTED` |
 | Pesan diedit (Telegram edit event) | update sinyal bila status masih `WAITING`; bila sudah `OPEN` → log saja |
-| Pesan sama terkirim ulang (zona & arah sama, < 5 menit) | abaikan sebagai duplikat |
+| Pesan sama terkirim ulang (zona & arah sama) | **tetap diproses** (16 Nov 2026, keputusan user); filter lama bisa diaktifkan lagi dengan `TG_DUPLICATE_WINDOW_SEC=300` |
 
 ---
 
@@ -160,7 +160,10 @@ Admin mengirim ulang laporan hari yang sama setelah setiap sinyal selesai (mis. 
 `Report` per tanggal, tiap kali bertambah satu baris). Yang dipakai: **pesan laporan terakhir per tanggal**.
 
 ### Kegunaan
-- **Bukan** sinyal penutupan — hanya rekap.
+- **Pemicu admin TP** (16 Nov 2026): baris *baru* `✅ …-TP` (dibanding Report sebelumnya di tanggal itu)
+  → posisi terbuka dari sinyal arah+level sama yang paling baru (≤ `TG_REPORT_LOOKBACK_H` jam, termasuk
+  kiriman dobel ≤ 5 menit) TP-nya diturunkan ke entry ± `TG_ADMIN_TP_PIPS` (sudah lewat → tutup).
+  Belum ada Report hari itu di DB → hanya baris terakhir yang dipakai. Baris SL diabaikan.
 - Dipakai untuk mencocokkan sinyal: baris ke-N laporan ↔ sinyal ke-N di tanggal itu
   (cek arah + 2 digit sama). Bila tidak cocok → flag `REPORT_MISMATCH`.
 - Dipakai sebagai "ground truth" provider untuk dibandingkan dengan hasil kita.
@@ -179,7 +182,18 @@ Ditemukan di riwayat (jumlah kira-kira), dikirim sebelum/sesudah sinyal lengkap:
 | `SL`, `LAST SL` | sinyal kena SL | ~540 |
 | `INSTAN`, `INSTAN TP` | langsung TP tanpa masuk zona dalam | ~340 |
 
-Belum dipakai di Tahap 1 (tetap `OTHER`). Kandidat untuk menandai sinyal selesai secara live (Tahap 3).
+Disimpan sebagai `OTHER`. **Sejak 16 Nov 2026 pesan TP dipakai live sebagai pemicu admin TP** (PLAN D15):
+
+```python
+ADMIN_TP_RE = re.compile(
+    r"^\W*(?:(?:hit|done)\s+)?(?:tp|zero|mid|last|instan|instant)\b(?!.*\bsl\b)", re.I | re.S)
+```
+Hanya pesan pendek (≤ 40 karakter) yang bukan sinyal/Report. Cocok: `TP`, `HIT TP`, `TP YAA`, `DONE TP`,
+`ZERO`, `MID`, `LAST`, `MID TP`, `LAST TP`, `TP DI LAST YAA`, `INSTAN`, `INSTAN TP`. Tidak cocok: `SL`,
+`LAST SL`, `BUY NOW`.
+
+Sinyal yang dimaksud: pesan yang di-*reply* admin bila ada; selain itu sinyal **aktif** (OPEN / PENDING /
+WAITING) paling baru ≤ `TG_REPORT_LOOKBACK_H` jam, plus kiriman dobelnya ≤ 5 menit.
 
 ---
 

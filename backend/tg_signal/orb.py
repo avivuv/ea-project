@@ -7,7 +7,7 @@ Pembukaan (jam lokal, dikonversi ke UTC per hari → DST otomatis):
   london 08:00 Europe/London | comex 08:20 America/New_York | ny 09:30 America/New_York
 Opening range (OR) = high/low bar M1 [open, open + L menit).
 Breakout: close pertama di luar OR dalam 120 menit setelah OR selesai.
-  conf m1 = close bar M1 | m5 = close bar M5 (bar M1 penutup bucket 5 menit).
+  conf m1 = close bar M1 | m5 = close bar M5 (bar M1 penutup bucket 5 menit) | bar = close tiap bar (data M5).
   Hanya breakout pertama per sesi per hari (gagal = selesai).
 Entry: market = open bar berikutnya | retest = limit di tepi OR (berlaku 30 bar; batal bila TP dulu).
 SL: opp = sisi seberang OR | mid = tengah OR (− $0.1).  Risiko ≥ $1.
@@ -36,6 +36,7 @@ RETEST_WAIT = 30
 HOLD_MIN = 6 * 60
 WIDTH_ATR = (0.3, 2.5)
 RISK_MIN = 1.0
+SL_BUF = 0.1               # $ di luar sisi range (instrumen lain: diatur relatif spread di orb_pairs)
 
 
 @dataclass(frozen=True)
@@ -73,12 +74,13 @@ def open_index(d: Data, session: str) -> list[int]:
 def run(d: Data, cfg: Cfg, opens: list[int]) -> pd.DataFrame:
     out = []
     one_min = np.timedelta64(1, "m")
+    bar_min = max(1, int(np.median(np.diff(d.t[:500])) / one_min))
     for i0 in opens:
         t0 = d.t[i0]
         i_or = int(np.searchsorted(d.t, t0 + cfg.or_min * one_min, side="left"))
         i_end = int(np.searchsorted(d.t, t0 + (cfg.or_min + BREAK_WAIT) * one_min, side="left"))
         i_exit = int(np.searchsorted(d.t, t0 + HOLD_MIN * one_min, side="left"))
-        if i_or - i0 < cfg.or_min * 0.8 or i_exit >= d.n:
+        if (i_or - i0) * bar_min < cfg.or_min * 0.8 or i_exit >= d.n:
             continue
         H0, L0 = d.arr[True][1], d.arr[True][2]
         hi, lo = H0[i0:i_or].max(), L0[i0:i_or].min()
@@ -106,7 +108,7 @@ def run(d: Data, cfg: Cfg, opens: list[int]) -> pd.DataFrame:
         sgn = 1 if is_buy else -1
         edge, opp = (hi, lo) if is_buy else (-lo, -hi)          # ruang BUY
         sl = opp if cfg.sl == "opp" else (edge + opp) / 2
-        sl -= 0.1
+        sl -= SL_BUF
         O = d.arr[is_buy][0]
         if cfg.entry == "market":
             entry = O[i + 1] + (d.spr[i + 1] if is_buy else 0.0)
@@ -225,14 +227,16 @@ def find_breakout(m1: pd.DataFrame, m5: pd.DataFrame, open_utc: pd.Timestamp, cf
     return out
 
 
-def plan_order(sig: dict, price: float) -> tuple[float, float, float] | None:
-    """(sl, tp, risk) untuk entry market di `price` (ask BUY / bid SELL). None bila risiko < RISK_MIN."""
+def plan_order(sig: dict, price: float, rr: float = float(LIVE_CFG.tp), sl_buf: float = 0.1,
+               risk_min: float = 1.0) -> tuple[float, float, float] | None:
+    """(sl, tp, risk) untuk entry market di `price` (ask BUY / bid SELL). SL = sisi seberang range ∓ sl_buf.
+    None bila risiko < risk_min."""
     if sig["dir"] == "BUY":
-        sl = sig["or_lo"] - 0.1
+        sl = sig["or_lo"] - sl_buf
         risk = price - sl
-        tp = price + float(LIVE_CFG.tp) * risk
+        tp = price + rr * risk
     else:
-        sl = sig["or_hi"] + 0.1
+        sl = sig["or_hi"] + sl_buf
         risk = sl - price
-        tp = price - float(LIVE_CFG.tp) * risk
-    return None if risk < RISK_MIN else (sl, tp, risk)
+        tp = price - rr * risk
+    return None if risk < risk_min else (sl, tp, risk)

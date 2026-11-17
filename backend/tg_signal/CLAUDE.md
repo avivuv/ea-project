@@ -13,7 +13,8 @@ Full Python — tidak ada EA MQL5 untuk eksekusi.
 - Komunikasi dalam Bahasa Indonesia.
 - Cek status tahap di PLAN.md sebelum mengerjakan; update checklist setelah selesai.
 - Jangan pernah menjalankan kode yang membuka order di akun LIVE. Uji eksekusi hanya mode `DEMO`.
-- Jangan membaca, menampilkan, atau commit isi `.env`, `*.session`, atau database di `data/`.
+- Jangan membaca, menampilkan, atau commit isi `.env`, `*.session`, atau database SQLite di `data/`.
+  Log (`data/*.log`, mis. `live.log`) dan CSV boleh dibaca untuk analisa (izin user 16 Nov 2026); jangan di-commit.
 - Jangan kirim isi pesan grup ke layanan luar.
 - Perubahan format/aturan parsing: update SIGNAL_SPEC.md dulu, lalu test, lalu kode.
 - Keputusan baru (O1–O7 di PLAN) dicatat di tabel "Sudah diputuskan".
@@ -21,7 +22,7 @@ Full Python — tidak ada EA MQL5 untuk eksekusi.
 ## Fakta penting
 - 2 digit sinyal = 2 digit terakhir bagian bulat harga (`62-58` @4165 → 4162/4158), resolve per angka ke kandidat terdekat.
 - 1 pip = $0.10 harga; SL 30 pips = $3.00 dari entry aktual.
-- Laporan harian (ZERO/MID/LAST-TP/SL) hanya rekap, bukan sinyal tutup.
+- Laporan harian (ZERO/MID/LAST-TP/SL): rekap kumulatif; baris baru `✅ …-TP` memicu admin TP (PLAN D14).
 - Sinyal valid sampai hit TP/SL (dihitung dari zona); setelah itu tidak dipakai lagi — tanpa timeout, tanpa re-entry.
 
 ## Menjalankan

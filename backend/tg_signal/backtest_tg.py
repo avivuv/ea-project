@@ -62,7 +62,7 @@ def load_signals(store: Store, start: datetime, end: datetime) -> list[Signal]:
         key = (r["direction"], r["level_first"], r["level_last"])
         prev = last_seen.get(key)
         last_seen[key] = t
-        if prev and (t - prev).total_seconds() <= DEDUP_SEC:
+        if DEDUP_SEC > 0 and prev and (t - prev).total_seconds() <= DEDUP_SEC:
             continue                                  # pesan pendek + pesan lengkap = 1 sinyal
         out.append(Signal(t, r["direction"], r["level_first"], r["level_last"], r["sl_pips"], r["msg_id"]))
     return out

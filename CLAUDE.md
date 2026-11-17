@@ -34,4 +34,5 @@ ea-project/
 ## Aturan penting
 - Komunikasi dalam Bahasa Indonesia.
 - Mode default `LOG` (tanpa order). Jangan pernah eksekusi di akun LIVE.
-- Jangan baca/tampilkan/commit `.env`, `*.session`, atau isi `tg_signal/data/`.
+- Jangan baca/tampilkan/commit `.env`, `*.session`, atau database SQLite di `tg_signal/data/`.
+  Log (`*.log`) dan CSV di `tg_signal/data/` **boleh dibaca** untuk analisa (izin user 16 Nov 2026), tapi jangan di-commit.

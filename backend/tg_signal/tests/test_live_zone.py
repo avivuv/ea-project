@@ -117,17 +117,17 @@ def test_demo_in_zone_enters_market(env):
     assert t["sl"] == pytest.approx(3967.0)
 
 
-def test_demo_pending_expires_when_tp_reached(env):
+def test_demo_pending_kept_when_price_reaches_tp(env):
     store, ex = env
     tr = run_live.LiveTrader(store, ex, "DEMO")
     ex.set(3982.68)
     add_signal(store, 1, "SELL", 84, 88)
     tr.handle_signal(CHAT, 1)
     assert status(store, 1) == "PENDING"
-    ex.set(3980.80)                         # ask ≤ ZERO − 30 pips (3981)
+    ex.set(3980.80)                         # harga sudah lewat ZERO − 30 pips, admin belum bilang TP
     tr.sync()
-    assert status(store, 1) == "EXPIRED"
-    assert not ex.orders
+    assert status(store, 1) == "PENDING"    # hangus karena TP hanya lewat chat admin
+    assert len(ex.orders) == 1
 
 
 def test_new_signal_replaces_pending(env):

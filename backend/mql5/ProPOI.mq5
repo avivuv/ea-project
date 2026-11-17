@@ -6,13 +6,14 @@
 //|   garis entry / SL / TP order.                                    |
 //| + area ORB New York (tg_signal/orb_live.py → orb_area.csv):       |
 //|   kotak opening range 15 mnt, garis level breakout, panah         |
-//|   breakout, entry / SL / TP posisi ORB.                           |
+//|   breakout, entry / SL / TP posisi ORB. Chart non-XAU (mis.       |
+//|   ETHUSD) hanya menggambar ORB dari orb_area_<simbol>.csv.        |
 //| Canvas dipakai karena kotak bawaan MT5 tidak bisa transparan dan  |
 //| area yang bertumpuk jadi putih (XOR).                             |
 //| Hanya tampilan — tidak membuka order apa pun.                     |
 //+------------------------------------------------------------------+
 #property copyright   "ea-project"
-#property version     "2.10"
+#property version     "2.20"
 #property description "Marker POI strategi sendiri (FVG/OB/IFVG M15, armed, entry/SL/TP) + area ORB New York"
 #property indicator_chart_window
 #property indicator_plots 0
@@ -32,7 +33,7 @@ input color  InpSLColor    = C'230,60,60';
 input color  InpTPColor    = C'20,170,60';
 input color  InpTextColor  = C'110,110,110';
 input bool   InpShowOrb    = true;              // tampilkan area ORB New York
-input string InpFileOrb    = "orb_area.csv";    // file ORB di folder Common\Files
+input string InpFileOrb    = "orb_area.csv";    // file ORB XAUUSD (simbol lain: orb_area_<simbol>.csv)
 input color  InpOrbColor   = C'150,90,230';     // kotak opening range ORB
 input int    InpOrbHoldMin = 360;               // panjang garis level ORB (menit sejak NY buka)
 
@@ -41,14 +42,27 @@ input int    InpOrbHoldMin = 360;               // panjang garis level ORB (meni
 struct Row { string rec, dir, kind; datetime t1; double p1, p2, p3; int flag; };
 Row     g_rows[];
 CCanvas g_cv;
+int     g_or_min = 15;                              // panjang opening range (dari baris HDR file ORB)
+
+bool IsGold() { return(StringFind(_Symbol, "XAUUSD") >= 0); }
+
+string OrbFile()
+  {
+   if(IsGold())
+      return(InpFileOrb);
+   string s = _Symbol;
+   StringToLower(s);
+   return("orb_area_" + s + ".csv");
+  }
 int     g_w = 0, g_h = 0;
 
 void ReadAll()
   {
    ArrayResize(g_rows, 0);
-   ReadFile(InpFile);
+   if(IsGold())
+      ReadFile(InpFile);
    if(InpShowOrb)
-      ReadFile(InpFileOrb);
+      ReadFile(OrbFile());
   }
 
 int OnInit()
@@ -87,8 +101,6 @@ int OnCalculate(const int rates_total, const int prev_calculated, const int begi
 //--- baca file CSV (8 kolom per baris), ditambahkan ke g_rows
 void ReadFile(const string file)
   {
-   if(StringFind(_Symbol, "XAUUSD") < 0)
-      return;
    int h = FileOpen(file, FILE_READ | FILE_CSV | FILE_ANSI | FILE_COMMON | FILE_SHARE_READ | FILE_SHARE_WRITE, ',');
    if(h == INVALID_HANDLE)
       return;
@@ -104,6 +116,8 @@ void ReadFile(const string file)
       r.p2   = StringToDouble(FileReadString(h));
       r.p3   = StringToDouble(FileReadString(h));
       r.flag = (int)StringToInteger(FileReadString(h));
+      if(r.rec == "HDR" && r.kind != "")
+         g_or_min = (int)StringToInteger(r.kind);
       if(r.rec == "POI" || r.rec == "ARMED" || r.rec == "ORDER" || r.rec == "ORB" || r.rec == "ORBBRK" ||
          r.rec == "ORBORD")
         {
@@ -188,8 +202,6 @@ void HLine(datetime t1, double p, color c, const string txt)
 //--- gambar ulang semua
 void Render()
   {
-   if(StringFind(_Symbol, "XAUUSD") < 0)
-      return;
    int w = (int)ChartGetInteger(0, CHART_WIDTH_IN_PIXELS);
    int h = (int)ChartGetInteger(0, CHART_HEIGHT_IN_PIXELS);
    if(w <= 0 || h <= 0)
@@ -239,7 +251,7 @@ void Render()
       else if(r.rec == "ORB")
         {
          // flag: 0 bentuk range · 1 tunggu breakout · 2 tanpa breakout · 3 breakout → order · 4 bias ✗
-         datetime t_or = r.t1 + 15 * 60;
+         datetime t_or = r.t1 + g_or_min * 60;
          datetime t_hold = r.t1 + InpOrbHoldMin * 60;
          Box2(r.t1, r.flag == 0 ? (datetime)r.p3 : t_or, r.p1, r.p2, InpOrbColor, InpAlpha,
               InpBorderAlpha);

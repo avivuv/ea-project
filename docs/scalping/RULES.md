@@ -30,7 +30,7 @@ NEW ─► WAITING ─► IN_ZONE ─► OPEN ─► CLOSED
 | NEW → WAITING | lolos validasi |
 | WAITING → IN_ZONE | harga menyentuh level `zero` |
 | IN_ZONE → OPEN | konfirmasi FVG/OB valid (lihat §3) **dan** lolos risk check (§5) |
-| IN_ZONE → EXPIRED | sinyal provider sudah selesai sebelum kita entry — salah satu: harga bergerak `TG_EXPIRE_TP_PIPS` (10) pips dari `zero` ke arah TP (= ZERO-TP versi provider) · harga melewati `last` sejauh `TG_SL_PIPS` (30) pips ke arah SL (= LAST-SL) |
+| IN_ZONE → EXPIRED | sinyal provider sudah selesai sebelum kita entry — salah satu: admin menyatakan TP di chat (Report `✅ …-TP` / pesan singkat `TP`, `MID`, …) — harga saja **tidak** menghanguskan pending (D16) · harga melewati `last` sejauh `TG_SL_PIPS` (30) pips ke arah SL (= LAST-SL) |
 | OPEN → CLOSED | TP / SL / BE / close manual / close-all |
 
 **Masa berlaku sinyal = sampai sinyal itu hit TP atau SL.** Tidak ada timeout waktu

@@ -134,6 +134,8 @@ class Broker:
         d = mt5.symbol_info(pos.symbol).digits
         res = mt5.order_send({"action": mt5.TRADE_ACTION_SLTP, "symbol": pos.symbol, "position": pos.ticket,
                               "sl": round(sl, d), "tp": pos.tp, "magic": pos.magic})
+        if res is not None and res.retcode == mt5.TRADE_RETCODE_NO_CHANGES:
+            return                                  # SL sudah di level itu
         if res is None or res.retcode != mt5.TRADE_RETCODE_DONE:
             raise RuntimeError(f"modify SL gagal #{pos.ticket}: {mt5.last_error() if res is None else (res.retcode, res.comment)}")
 
@@ -150,18 +152,34 @@ class Broker:
             raise RuntimeError(f"close gagal #{pos.ticket}")
 
 
-def trail_sl(pos, h1: pd.DataFrame, info: dict, v: sw.V, is_buy: bool) -> float | None:
-    """SL chandelier baru (sama dengan backtest): ekstrem bid sejak bar entry − trail. None = tidak berubah."""
+def trail_sl(pos, h1: pd.DataFrame, info: dict, v: sw.V, is_buy: bool, digits: int) -> float | None:
+    """SL chandelier baru (sama dengan backtest): ekstrem bid sejak bar entry − trail. None = tidak berubah.
+
+    Dibandingkan SETELAH dibulatkan ke digit simbol: tanpa ini SL yang secara pembulatan sama dengan
+    SL sekarang tetap dikirim → broker menolak (retcode 10025 'No changes') tiap 30 detik."""
     trail_m = float(v.exit[5:])
     trail = trail_m / v.sl_atr * info["sl_dist"]
     since = h1[h1.index >= pd.Timestamp(info["entry_bar"])]
     if since.empty:
         return None
+    half = 0.5 * 10 ** -digits
     if is_buy:
-        new = since.high.max() - trail
-        return new if new > pos.sl + 1e-9 else None
-    new = since.low.min() + trail
-    return new if new < pos.sl - 1e-9 else None
+        new = round(since.high.max() - trail, digits)
+        return new if new > pos.sl + half else None
+    new = round(since.low.min() + trail, digits)
+    return new if new < pos.sl - half else None
+
+
+def sl_valid(bk: Broker, pos, sl: float, is_buy: bool) -> tuple[bool, str]:
+    """SL harus di sisi yang benar dari harga sekarang dengan jarak ≥ stops level (aturan broker)."""
+    mt5 = bk.mt5
+    i, tk = mt5.symbol_info(pos.symbol), mt5.symbol_info_tick(pos.symbol)
+    min_dist = max(i.trade_stops_level, i.trade_freeze_level) * i.point
+    if is_buy:
+        ok = tk.bid - sl >= min_dist
+        return ok, f"bid {tk.bid} − SL {sl} < jarak min {min_dist:g}"
+    ok = sl - tk.ask >= min_dist
+    return ok, f"SL {sl} − ask {tk.ask} < jarak min {min_dist:g}"
 
 
 def step(bk: Broker, st: dict, dry: bool = False) -> None:
@@ -190,8 +208,15 @@ def step(bk: Broker, st: dict, dry: bool = False) -> None:
                         bk.close(pos, f"{mid} max hold")
                     log(f"[{mid}] tutup #{pos.ticket}: hold > {MAX_HOLD_DAYS} hari")
                     continue
-                new = trail_sl(pos, h1, info, v, is_buy)
+                new = trail_sl(pos, h1, info, v, is_buy, bk.mt5.symbol_info(sym).digits)
                 if new is not None:
+                    ok, why = sl_valid(bk, pos, new, is_buy)
+                    if not ok:                     # harga sudah lewat level trailing → tunggu, jangan spam error
+                        if info.get("sl_skip") != new:
+                            info["sl_skip"] = new
+                            log(f"[{mid}] trailing #{pos.ticket} ditunda: {why}")
+                        continue
+                    info.pop("sl_skip", None)
                     if not dry:
                         bk.modify_sl(pos, new)
                     log(f"[{mid}] trailing #{pos.ticket} SL {pos.sl:.3f} → {new:.3f}")

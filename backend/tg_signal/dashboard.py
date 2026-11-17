@@ -1,7 +1,7 @@
 """
 Dashboard monitoring (NiceGUI) — HANYA MEMBACA database, log, dan akun MT5.
 Kontrol: Pause/Resume (file data/PAUSE: EA sinyal, SMC Top-Down & ORB NY) dan Pause swing.
-Bagian: EA sinyal Telegram, swing Donchian, SMC Top-Down (pro_live), ORB NY (orb_live).
+Bagian: EA sinyal Telegram, swing Donchian, SMC Top-Down (pro_live), ORB NY XAUUSD & ETHUSD (orb_live).
 
     python -m tg_signal.dashboard            # buka http://127.0.0.1:8080
     python -m tg_signal.dashboard --port 8081
@@ -21,7 +21,7 @@ from nicegui import app, ui
 import pandas as pd
 
 from tg_signal import orb, settings
-from tg_signal.orb_live import ORB_LOT, ORB_MAGIC, ORB_RISK_USD
+from tg_signal.orb_live import SPECS as ORB_SPECS
 
 WIB = timedelta(hours=7)
 REFRESH_SEC = 3
@@ -123,8 +123,8 @@ def pro_snapshot() -> dict:
     return magic_snapshot(settings.PRO_MAGIC)
 
 
-def magic_snapshot(mg: int) -> dict:
-    """Posisi, pending, dan deal tutup milik satu magic number. Gagal -> dict kosong."""
+def magic_snapshot(mg: int, symbol: str = settings.SYMBOL) -> dict:
+    """Posisi, pending, dan deal tutup milik satu magic number di satu simbol. Gagal -> dict kosong."""
     try:
         import MetaTrader5 as mt5
         if not mt5.initialize():
@@ -132,11 +132,11 @@ def magic_snapshot(mg: int) -> dict:
         pos = [{"ticket": p.ticket, "dir": "BUY" if p.type == 0 else "SELL", "entry": p.price_open, "sl": p.sl,
                 "tp": p.tp, "price": p.price_current, "profit": p.profit + p.swap,
                 "time": datetime.fromtimestamp(p.time, timezone.utc)}
-               for p in (mt5.positions_get(symbol=settings.SYMBOL) or ()) if p.magic == mg]
+               for p in (mt5.positions_get(symbol=symbol) or ()) if p.magic == mg]
         pend = [{"ticket": o.ticket, "dir": "BUY" if o.type == mt5.ORDER_TYPE_BUY_LIMIT else "SELL",
                  "price": o.price_open, "sl": o.sl, "tp": o.tp,
                  "time": datetime.fromtimestamp(o.time_setup, timezone.utc)}
-                for o in (mt5.orders_get(symbol=settings.SYMBOL) or ()) if o.magic == mg]
+                for o in (mt5.orders_get(symbol=symbol) or ()) if o.magic == mg]
         now = datetime.now(timezone.utc)
         deals = mt5.history_deals_get(now - timedelta(days=365), now + timedelta(days=1)) or ()
         mine = {d.position_id for d in deals if d.magic == mg}
@@ -189,6 +189,113 @@ def program_status() -> tuple[str, str]:
         return "AKTIF", "good"
     mins = int(age // 60)
     return (f"tidak ada aktivitas {mins} menit", "warn") if age < 3600 else ("MATI / DIAM", "bad")
+
+
+def orb_panel(spec):
+    """Panel satu instrumen ORB (dibangun di dalam tab). Return fungsi refresh → (total USD, jumlah trade)."""
+    cfg = spec.cfg
+    rule = (f"range {cfg.or_min} mnt · " + ("searah bias EMA50 H1" if cfg.bias == "with" else "tanpa filter bias")
+            + f" · TP {cfg.tp}R · {spec.lot_text} · magic {spec.magic}")
+    with ui.element("div").classes("card w-full"):
+        with ui.row().classes("w-full items-center justify-between"):
+            with ui.column().classes("gap-0"):
+                ui.label(f"ORB NY {spec.symbol}").classes("text-lg font-semibold")
+                ui.label(rule).classes("sub")
+            prog = ui.label("").classes("font-semibold")
+        with ui.grid(columns="repeat(auto-fit, minmax(220px, 1fr))").classes("w-full gap-3"):
+            with ui.column().classes("gap-0"):
+                ui.label("Hari ini").classes("label")
+                day_v = ui.label("-").classes("value num")
+                day_s = ui.label("").classes("sub num")
+            with ui.column().classes("gap-0"):
+                ui.label("Posisi").classes("label")
+                pos_v = ui.label("-").classes("value num")
+                pos_s = ui.label("").classes("sub num")
+            with ui.column().classes("gap-0"):
+                ui.label("Hasil (trade tutup)").classes("label")
+                res_v = ui.label("-").classes("value num")
+                res_s = ui.label("").classes("sub num")
+        with ui.row().classes("w-full gap-3 items-start no-wrap max-md:flex-wrap"):
+            with ui.column().classes("flex-1 min-w-[320px] gap-1"):
+                ui.label(f"Trade ORB {spec.symbol}").classes("label")
+                table = ui.table(columns=[
+                    {"name": "tutup", "label": "Tutup", "field": "tutup", "align": "left"},
+                    {"name": "arah", "label": "Arah", "field": "arah", "align": "left"},
+                    {"name": "entry", "label": "Entry", "field": "entry", "align": "right"},
+                    {"name": "exit", "label": "Exit", "field": "exit", "align": "right"},
+                    {"name": "hasil", "label": "Hasil", "field": "hasil", "align": "left"},
+                    {"name": "usd", "label": "USD", "field": "usd", "align": "right"},
+                ], rows=[], row_key="k", pagination=6).classes("w-full").props("dense flat dark")
+            with ui.column().classes("flex-1 min-w-[320px] gap-1"):
+                ui.label(f"Log ORB {spec.symbol}").classes("label")
+                log_box = ui.label("").classes("logbox")
+
+    def hm(t) -> str:
+        return pd.Timestamp(t).tz_convert("Asia/Jakarta").strftime("%H:%M")
+
+    def refresh() -> tuple[float, int]:
+        txt, cls = file_status(spec.log_path.name, spec.heartbeat.name)
+        paused = settings.PAUSE_FILE.exists()
+        prog.text = f"● {txt}" + (" · PAUSE" if paused else "")
+        prog.classes(replace=f"font-semibold {('warn' if paused else cls)}")
+        now = pd.Timestamp.now(tz="UTC")
+        ny_now = now.tz_convert("America/New_York")
+        op = orb.session_open_utc(ny_now.date())
+        or_end = op + pd.Timedelta(minutes=cfg.or_min)
+        brk_end = or_end + pd.Timedelta(minutes=orb.BREAK_WAIT)
+        st = {}
+        if spec.state_path.exists():
+            try:
+                st = json.loads(spec.state_path.read_text(encoding="utf-8"))
+            except ValueError:
+                st = {}
+        today = st.get("day") == str(ny_now.date())
+        rng = st.get("or") if today else None
+        rng_txt = f"range {rng[1]:.2f}–{rng[0]:.2f} (lebar {rng[0] - rng[1]:.2f})" if rng else ""
+        if ny_now.weekday() >= 5:
+            head, sub = "libur", "pasar NY tutup (Sabtu/Minggu)"
+        elif now < op:
+            head, sub = "menunggu NY buka", f"range dibentuk {hm(op)}–{hm(or_end)} WIB"
+        elif now < or_end:
+            head, sub = "membentuk range", f"sampai {hm(or_end)} WIB"
+        elif today and st.get("pos"):
+            head, sub = "posisi terbuka", rng_txt
+        elif today and not st.get("done") and now < brk_end:
+            head, sub = "tunggu breakout", " · ".join(x for x in (rng_txt, f"s/d {hm(brk_end)} WIB") if x)
+        else:
+            head, sub = "selesai hari ini", rng_txt
+        day_v.text, day_s.text = head, sub
+        day_v.classes(replace="value num " + ("warn" if head == "tunggu breakout" else ""))
+        snap = magic_snapshot(spec.magic, spec.symbol)
+        pos = next(iter(snap.get("pos", [])), None)
+        if pos:
+            close_at = (st.get("pos") or {}).get("close_at")
+            pos_v.text = f"{pos['dir']} {pos['profit']:+.2f} USD"
+            pos_v.classes(replace="value num " + ("good" if pos["profit"] > 0 else "bad" if pos["profit"] < 0 else ""))
+            pos_s.text = (f"@ {pos['entry']:.2f} · SL {pos['sl']:.2f} · TP {pos['tp']:.2f} · sekarang {pos['price']:.2f}"
+                          + (f" · tutup paksa {hm(close_at)} WIB" if close_at else ""))
+        else:
+            pos_v.text = "tidak ada"
+            pos_v.classes(replace="value num")
+            pos_s.text = "maks 1 trade per hari"
+        closed = snap.get("closed", [])
+        n = len(closed)
+        tot = sum(c["usd"] for c in closed)
+        w = sum(1 for c in closed if c["usd"] > 0)
+        res_v.text = f"{tot:+.2f} USD" if n else "-"
+        res_v.classes(replace="value num " + ("good" if tot > 0 else "bad" if tot < 0 else ""))
+        res_s.text = f"{n} trade · untung {w} · rugi {n - w}" + (f" · winrate {100 * w / n:.0f}%" if n else "")
+        table.rows = [{"k": i, "tutup": (c["time"] + WIB).strftime("%d/%m %H:%M"), "arah": c["dir"],
+                       "entry": f"{c['entry']:.2f}", "exit": f"{c['exit']:.2f}",
+                       "hasil": "time stop" if c["why"] == "tutup EA" else c["why"],
+                       "usd": f"{c['usd']:+.2f}"} for i, c in enumerate(reversed(closed))]
+        table.update()
+        if spec.log_path.exists():
+            lines = spec.log_path.read_text(encoding="utf-8", errors="replace").splitlines()[-30:]
+            log_box.text = "\n".join(ln[11:] for ln in reversed(lines))
+        return tot, n
+
+    return refresh
 
 
 # ── UI ──────────────────────────────────────────────────────────────────────
@@ -437,111 +544,25 @@ def build() -> None:
                     pro_log.text = "\n".join(ln[11:] for ln in reversed(lines))
 
         with ui.tab_panel(tab_orb).classes("p-0 gap-3"):
-            # ── ORB New York ────────────────────────────────────────────────────
+            # ── ORB New York (satu panel per instrumen) ─────────────────────────
             with ui.row().classes("w-full items-center justify-between"):
                 with ui.column().classes("gap-0"):
-                    ui.label("ORB New York XAUUSD").classes("text-xl font-semibold")
-                    lot_txt = f"risiko ${ORB_RISK_USD:g}/trade" if ORB_RISK_USD > 0 else f"lot {ORB_LOT}"
-                    ui.label("Range 15 menit pertama setelah NY buka (09:30 New York, DST otomatis) · breakout close M5 "
-                             "≤ 2 jam · searah bias EMA50 H1 · SL sisi seberang range · TP 2R · tutup paksa 6 jam "
-                             f"setelah buka · maks 1 trade/hari · {lot_txt} · ikut tombol Pause").classes("sub")
-                orb_prog = ui.label("").classes("font-semibold")
-            with ui.grid(columns="repeat(auto-fit, minmax(240px, 1fr))").classes("w-full gap-3"):
-                with ui.element("div").classes("card"):
-                    ui.label("Hari ini").classes("label")
-                    orb_day_v = ui.label("-").classes("value num")
-                    orb_day_s = ui.label("").classes("sub num")
-                with ui.element("div").classes("card"):
-                    ui.label("Posisi").classes("label")
-                    orb_pos_v = ui.label("-").classes("value num")
-                    orb_pos_s = ui.label("").classes("sub num")
-                with ui.element("div").classes("card"):
-                    ui.label("Hasil (trade tutup)").classes("label")
-                    orb_v = ui.label("-").classes("value num")
-                    orb_s = ui.label("").classes("sub num")
-            with ui.row().classes("w-full gap-3 items-start no-wrap max-md:flex-wrap"):
-                with ui.element("div").classes("card flex-1 min-w-[320px]"):
-                    ui.label("Trade ORB NY").classes("label")
-                    orb_table = ui.table(columns=[
-                        {"name": "tutup", "label": "Tutup", "field": "tutup", "align": "left"},
-                        {"name": "arah", "label": "Arah", "field": "arah", "align": "left"},
-                        {"name": "entry", "label": "Entry", "field": "entry", "align": "right"},
-                        {"name": "exit", "label": "Exit", "field": "exit", "align": "right"},
-                        {"name": "hasil", "label": "Hasil", "field": "hasil", "align": "left"},
-                        {"name": "usd", "label": "USD", "field": "usd", "align": "right"},
-                    ], rows=[], row_key="k", pagination=8).classes("w-full").props("dense flat dark")
-                with ui.element("div").classes("card flex-1 min-w-[320px]"):
-                    ui.label("Log ORB NY").classes("label")
-                    orb_log = ui.label("").classes("logbox")
+                    ui.label("ORB New York — Opening Range Breakout").classes("text-xl font-semibold")
+                    ui.label("Range setelah NY buka 09:30 New York (DST otomatis) · breakout = close M5 di luar range "
+                             "≤ 2 jam · entry market · SL sisi seberang range · TP 2R · tutup paksa 6 jam setelah "
+                             "buka · maks 1 trade/hari per instrumen · ikut tombol Pause").classes("sub")
+                orb_total = ui.label("").classes("font-semibold num")
+            orb_refreshers = [orb_panel(spec) for spec in ORB_SPECS.values()]
 
             def refresh_orb() -> None:
-                txt, cls = file_status("orb_live.log", "orb_heartbeat")
-                paused = settings.PAUSE_FILE.exists()
-                orb_prog.text = f"● ORB NY: {txt}" + (" · PAUSE" if paused else "")
-                orb_prog.classes(replace=f"font-semibold {('warn' if paused else cls)}")
-                now = pd.Timestamp.now(tz="UTC")
-                ny_now = now.tz_convert("America/New_York")
-                op = orb.session_open_utc(ny_now.date())
-                or_end = op + pd.Timedelta(minutes=orb.LIVE_CFG.or_min)
-                brk_end = or_end + pd.Timedelta(minutes=orb.BREAK_WAIT)
-
-                def hm(t) -> str:
-                    return pd.Timestamp(t).tz_convert("Asia/Jakarta").strftime("%H:%M")
-
-                st = {}
-                path = settings.DATA_DIR / "orb_live_state.json"
-                if path.exists():
-                    try:
-                        st = json.loads(path.read_text(encoding="utf-8"))
-                    except ValueError:
-                        st = {}
-                today = st.get("day") == str(ny_now.date())
-                rng = st.get("or") if today else None
-                rng_txt = f"range {rng[1]:.2f}–{rng[0]:.2f} (lebar {rng[0] - rng[1]:.2f})" if rng else ""
-                if ny_now.weekday() >= 5:
-                    head, sub = "libur", "pasar NY tutup (Sabtu/Minggu)"
-                elif now < op:
-                    head, sub = "menunggu NY buka", f"range dibentuk {hm(op)}–{hm(or_end)} WIB"
-                elif now < or_end:
-                    head, sub = "membentuk range", f"sampai {hm(or_end)} WIB"
-                elif today and st.get("pos"):
-                    head, sub = "posisi terbuka", rng_txt
-                elif today and not st.get("done") and now < brk_end:
-                    head, sub = "tunggu breakout", " · ".join(x for x in (rng_txt, f"s/d {hm(brk_end)} WIB") if x)
-                else:
-                    head, sub = "selesai hari ini", rng_txt
-                orb_day_v.text, orb_day_s.text = head, sub
-                orb_day_v.classes(replace="value num " + ("warn" if head == "tunggu breakout" else ""))
-                snap = magic_snapshot(ORB_MAGIC)
-                p = next(iter(snap.get("pos", [])), None)
-                if p:
-                    close_at = (st.get("pos") or {}).get("close_at")
-                    orb_pos_v.text = f"{p['dir']} {p['profit']:+.2f} USD"
-                    orb_pos_v.classes(replace="value num " + ("good" if p["profit"] > 0
-                                                              else "bad" if p["profit"] < 0 else ""))
-                    orb_pos_s.text = (f"@ {p['entry']:.2f} · SL {p['sl']:.2f} · TP {p['tp']:.2f} · "
-                                      f"sekarang {p['price']:.2f}"
-                                      + (f" · tutup paksa {hm(close_at)} WIB" if close_at else ""))
-                else:
-                    orb_pos_v.text = "tidak ada"
-                    orb_pos_v.classes(replace="value num")
-                    orb_pos_s.text = "maks 1 trade per hari"
-                closed = snap.get("closed", [])
-                n = len(closed)
-                tot = sum(c["usd"] for c in closed)
-                w = sum(1 for c in closed if c["usd"] > 0)
-                orb_v.text = f"{tot:+.2f} USD" if n else "-"
-                orb_v.classes(replace="value num " + ("good" if tot > 0 else "bad" if tot < 0 else ""))
-                orb_s.text = f"{n} trade · untung {w} · rugi {n - w}" + (f" · winrate {100 * w / n:.0f}%" if n else "")
-                orb_table.rows = [{"k": i, "tutup": (c["time"] + WIB).strftime("%d/%m %H:%M"), "arah": c["dir"],
-                                   "entry": f"{c['entry']:.2f}", "exit": f"{c['exit']:.2f}",
-                                   "hasil": "time stop" if c["why"] == "tutup EA" else c["why"],
-                                   "usd": f"{c['usd']:+.2f}"} for i, c in enumerate(reversed(closed))]
-                orb_table.update()
-                log = settings.DATA_DIR / "orb_live.log"
-                if log.exists():
-                    lines = log.read_text(encoding="utf-8", errors="replace").splitlines()[-40:]
-                    orb_log.text = "\n".join(ln[11:] for ln in reversed(lines))
+                tot = 0.0
+                n = 0
+                for f in orb_refreshers:
+                    t, k = f()
+                    tot += t
+                    n += k
+                orb_total.text = f"Total ORB: {tot:+.2f} USD · {n} trade" if n else "Total ORB: belum ada trade"
+                orb_total.classes(replace="font-semibold num " + ("good" if tot > 0 else "bad" if tot < 0 else ""))
 
     def toggle_pause() -> None:
         if settings.PAUSE_FILE.exists():

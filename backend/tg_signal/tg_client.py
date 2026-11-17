@@ -43,6 +43,16 @@ def in_topic(msg, topic_id: int) -> bool:
     return (r.reply_to_top_id or r.reply_to_msg_id) == topic_id
 
 
+def replied_msg_id(msg) -> int | None:
+    """ID pesan yang di-reply (bukan sekadar pesan di dalam topik forum), atau None."""
+    r = msg.reply_to
+    if r is None or not r.reply_to_msg_id:
+        return None
+    if getattr(r, "forum_topic", False) and not r.reply_to_top_id:
+        return None                                 # hanya penanda topik, bukan reply ke pesan
+    return r.reply_to_msg_id
+
+
 def _sender_name(msg) -> str | None:
     # Admin anonim bertanda tangan ("Admin 3"): from_id kosong, nama ada di post_author
     if msg.post_author:

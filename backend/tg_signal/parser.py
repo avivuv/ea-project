@@ -23,6 +23,10 @@ REPORT_LINE_RE = re.compile(
     re.I | re.M,
 )
 
+ADMIN_TP_RE = re.compile(
+    r"^\W*(?:(?:hit|done)\s+)?(?:tp|zero|mid|last|instan|instant)\b(?!.*\bsl\b)", re.I | re.S)
+ADMIN_TP_MAX_LEN = 40
+
 
 @dataclass
 class ParsedSignal:
@@ -105,6 +109,14 @@ def parse_report(text: str) -> ParsedReport | None:
             outcome=m.group(7).upper(),
         ))
     return report
+
+
+def is_admin_tp(text: str) -> bool:
+    """Pesan singkat admin yang menyatakan sinyal terakhir sudah TP (ZERO/MID/LAST/TP/INSTAN)."""
+    t = (text or "").strip()
+    if not t or len(t) > ADMIN_TP_MAX_LEN or parse_report(t) or parse_signal(t):
+        return False
+    return bool(ADMIN_TP_RE.match(t))
 
 
 def classify(text: str) -> str:

@@ -64,7 +64,7 @@ TG_EXPIRE_TP_PIPS = _f("TG_EXPIRE_TP_PIPS", 10)
 TG_MAX_ZONE_DISTANCE = _f("TG_MAX_ZONE_DISTANCE", 15.0)   # dalam $ harga
 TG_ZONE_WIDTH_MIN = _f("TG_ZONE_WIDTH_MIN", 1)
 TG_ZONE_WIDTH_MAX = _f("TG_ZONE_WIDTH_MAX", 10)
-TG_DUPLICATE_WINDOW_SEC = _i("TG_DUPLICATE_WINDOW_SEC", 300)
+TG_DUPLICATE_WINDOW_SEC = _i("TG_DUPLICATE_WINDOW_SEC", 0)   # 0 = tanpa filter duplikat (16 Nov 2026: user minta semua sinyal diproses)
 TG_POLL_SEC = _f("TG_POLL_SEC", 3)          # cek aktif pesan baru (push Telegram bisa telat ±60 dtk)
 
 # ── Eksekusi (Tahap 4, akun demo) ───────────────────────────────────────────
@@ -83,10 +83,17 @@ TG_POI_MIN_SIZE = _f("TG_POI_MIN_SIZE", 0.2)                   # ukuran minimum 
 # Tanpa POI di zona: NONE = sinyal WAITING, dicek ulang tiap bar sampai POI terbentuk / sinyal selesai
 # (keputusan user 13 Nov 2026: sedikit order tapi presisi) | ZERO = pending di ZERO seperti mode ZONE
 TG_POI_FALLBACK = os.getenv("TG_POI_FALLBACK", "NONE").upper()
-# Admin sudah "tp" (harga sampai ZERO ± TG_EXPIRE_TP_PIPS) tapi posisi kita belum TP → TP diturunkan ke
+# 1 = sinyal baru membatalkan pending/WAITING lama; 0 = semua sinyal tetap jalan berdampingan (16 Nov 2026)
+TG_POI_REPLACE_PENDING = _i("TG_POI_REPLACE_PENDING", 0)
+# Admin sudah "tp" (lihat TG_ADMIN_TP_SOURCE) tapi posisi kita belum TP → TP diturunkan ke
 # entry ± ini (harga sudah lewat → tutup). Keputusan user 13 Nov 2026; backtest admin_tp_study.py:
 # rugi berkurang ~30–50% di dua periode. 0 = off.
 TG_ADMIN_TP_PIPS = _f("TG_ADMIN_TP_PIPS", 20)
+# Pemicu admin TP: REPORT (default, keputusan user 16 Nov 2026 — "sudah TP" murni dari chat admin Telegram:
+# baris baru "✅ ...-TP" di Report atau pesan singkat TP/MID/INSTAN); PRICE = harga sampai ZERO ± TG_EXPIRE_TP_PIPS;
+# BOTH = mana yang duluan.
+TG_ADMIN_TP_SOURCE = os.getenv("TG_ADMIN_TP_SOURCE", "REPORT").upper()
+TG_REPORT_LOOKBACK_H = _f("TG_REPORT_LOOKBACK_H", 12)   # baris Report hanya dicocokkan ke sinyal ≤ sekian jam
 TG_TP_PIPS = _f("TG_TP_PIPS", 30)                       # TP = SL = 30 pips (keputusan user)
 TG_SL_FROM = os.getenv("TG_SL_FROM", "entry")           # entry | zone (LAST − SL)
 TG_MAGIC = _i("TG_MAGIC", 990011)                       # penanda order milik program ini
