@@ -41,6 +41,8 @@ MIN_SLOPE = 0.1            # EMA50 H1 harus bergerak > 0.1 ATR / 3 bar (pro_sl_a
 HEARTBEAT = settings.DATA_DIR / "pro_heartbeat"
 STATE_PATH = settings.DATA_DIR / "pro_live_state.json"
 TRADES_PATH = settings.DATA_DIR / "pro_live_trades.csv"
+CHOCH_SHOW_BARS = 288          # marker CHoCH M5 yang ditampilkan: 24 jam terakhir
+CHOCH_SHOW_MAX = 8             # maks per arah
 LOOP_SEC = 5
 
 
@@ -101,6 +103,13 @@ class ProTrader:
                 lo, hi = sorted((sg * p[2], sg * p[3]))
                 log.info("%s ARMED: harga menyentuh POI M15 %s %.2f–%.2f (bias EMA50 H1 searah), "
                          "tunggu CHoCH M5", d, p[4], lo, hi)
+            for k, lvl, ci, p in final.get("chochs", []):
+                if ci == last_i:
+                    sg = 1 if is_buy else -1
+                    log.info("%s CHoCH M5: close %s %s %.2f (swing %s WIB) · POI M15 %s", d,
+                             "di atas" if is_buy else "di bawah", "swing high" if is_buy else "swing low",
+                             sg * lvl, (pd.Timestamp(mk.t[k]) + pd.Timedelta(hours=7)).strftime("%d/%m %H:%M"),
+                             p[4])
             if d in self.state["live"]:
                 continue
             self.maybe_order(d, is_buy, mk, st, s, last_i, in_news, tick)
@@ -111,8 +120,10 @@ class ProTrader:
             log.exception("gagal menulis marker POI")
 
     def export_markers(self, mk: ps.Market, finals: dict, tick) -> None:
-        """Tulis POI M15 aktif, POI armed, dan order ke Common\\Files\\pro_poi.csv untuk indikator ProPOI (MT5).
-        Format per baris (8 kolom): rec,dir,kind,t1(epoch jam server),p1,p2,p3,flag."""
+        """Tulis POI M15 aktif, POI armed, CHoCH M5, dan order ke Common\\Files\\pro_poi.csv untuk indikator
+        ProPOI (MT5). Format per baris (8 kolom): rec,dir,kind,t1(epoch jam server),p1,p2,p3,flag.
+        CHOCH: t1 = waktu swing, p1 = level, p2 = epoch bar break (kind 'wait': bar terakhir),
+        flag 1 = CHoCH sudah terjadi, 0 = level yang ditunggu saat POI armed."""
         i = mk.n - 2                                    # bar M5 terakhir yang sudah close
         off = int(settings.MT5_UTC_OFFSET_H * 3600)
         epoch = lambda k: int(mk.t[k].astype("datetime64[s]").astype(np.int64)) + off
@@ -133,6 +144,14 @@ class ProTrader:
                 p = f["s"]["poi"]
                 lo, hi = sorted((sg * p[2], sg * p[3]))
                 rows.append(f"ARMED,{d},{p[4]},{epoch(f['s']['arm_i'])},{lo:.2f},{hi:.2f},0,1")
+                if "ch_k" in f["s"]:                    # level CHoCH yang ditunggu (garis putus)
+                    rows.append(f"CHOCH,{d},wait,{epoch(f['s']['ch_k'])},{sg * f['s']['ch_lvl']:.2f},"
+                                f"{epoch(i)},0,0")
+            # CHoCH M5 yang sudah terjadi (24 jam terakhir, dekat harga): garis swing → bar break
+            recent = [c for c in f.get("chochs", []) if c[2] >= i - CHOCH_SHOW_BARS
+                      and abs(sg * c[1] - px) <= 40][-CHOCH_SHOW_MAX:]
+            for k, lvl, ci, p in recent:
+                rows.append(f"CHOCH,{d},{p[4]},{epoch(k)},{sg * lvl:.2f},{epoch(ci)},0,1")
             rec = self.state["live"].get(d)
             if rec:
                 t = int(pd.Timestamp(rec["placed"]).timestamp()) + off

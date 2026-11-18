@@ -3,7 +3,8 @@
 //| Membaca Common\Files\pro_poi.csv (ditulis pro_live tiap bar M5)  |
 //| dan menggambar di canvas transparan (ARGB):                       |
 //|   kotak POI M15 (FVG/OB/IFVG), POI "armed" (tunggu CHoCH M5),     |
-//|   garis entry / SL / TP order.                                    |
+//|   tanda CHoCH M5 (garis swing → bar break + label) dan level      |
+//|   CHoCH yang sedang ditunggu (garis putus), garis entry/SL/TP.    |
 //| + area ORB New York (tg_signal/orb_live.py → orb_area.csv):       |
 //|   kotak opening range 15 mnt, garis level breakout, panah         |
 //|   breakout, entry / SL / TP posisi ORB. Chart non-XAU (mis.       |
@@ -13,8 +14,8 @@
 //| Hanya tampilan — tidak membuka order apa pun.                     |
 //+------------------------------------------------------------------+
 #property copyright   "ea-project"
-#property version     "2.20"
-#property description "Marker POI strategi sendiri (FVG/OB/IFVG M15, armed, entry/SL/TP) + area ORB New York"
+#property version     "2.30"
+#property description "Marker POI strategi sendiri (FVG/OB/IFVG M15, armed, CHoCH M5, entry/SL/TP) + area ORB New York"
 #property indicator_chart_window
 #property indicator_plots 0
 
@@ -28,6 +29,9 @@ input color  InpBuyColor   = C'0,150,80';       // demand (bias BUY aktif)
 input color  InpSellColor  = C'215,45,45';      // supply (bias SELL aktif)
 input color  InpOffColor   = C'130,130,130';    // POI tanpa bias
 input color  InpArmedColor = C'230,170,0';      // POI yang sedang disentuh, tunggu CHoCH
+input bool   InpShowChoch  = true;              // tampilkan tanda CHoCH M5 & level CHoCH yang ditunggu
+input color  InpChochBuy   = C'0,170,120';      // CHoCH bullish (close di atas swing high)
+input color  InpChochSell  = C'235,80,140';     // CHoCH bearish (close di bawah swing low)
 input color  InpEntryColor = C'30,120,255';
 input color  InpSLColor    = C'230,60,60';
 input color  InpTPColor    = C'20,170,60';
@@ -119,7 +123,7 @@ void ReadFile(const string file)
       if(r.rec == "HDR" && r.kind != "")
          g_or_min = (int)StringToInteger(r.kind);
       if(r.rec == "POI" || r.rec == "ARMED" || r.rec == "ORDER" || r.rec == "ORB" || r.rec == "ORBBRK" ||
-         r.rec == "ORBORD")
+         r.rec == "ORBORD" || r.rec == "CHOCH")
         {
          ArrayResize(g_rows, k + 1);
          g_rows[k++] = r;
@@ -188,6 +192,46 @@ void Seg(datetime t1, datetime t2, double p, color c, uchar a)
    g_cv.LineHorizontal(ClampX(x1), MathMin(ClampX(x2), g_w - 60), y1, ColorToARGB(c, a));
   }
 
+//--- garis horizontal putus-putus dari t1 ke tepi kanan
+void DashRight(datetime t1, double p, color c, uchar a)
+  {
+   int x, y;
+   if(!XY(t1, p, x, y))
+      return;
+   int xr = g_w - 60;
+   for(int xs = ClampX(x); xs < xr; xs += 9)
+      g_cv.LineHorizontal(xs, MathMin(xs + 5, xr), y, ColorToARGB(c, a));
+  }
+
+//--- tanda CHoCH: garis dari swing ke bar break, label di tengah, titik di bar break
+void Choch(const Row &r)
+  {
+   bool buy = (r.dir == "BUY");
+   if(r.flag == 0)
+     {
+      DashRight(r.t1, r.p1, InpArmedColor, 230);
+      int x, y;
+      if(XY(r.t1, r.p1, x, y))
+         g_cv.TextOut(g_w - 64, buy ? y - 14 : y + 2,
+                      "level CHoCH M5 " + DoubleToString(r.p1, _Digits) +
+                      (buy ? " · tunggu close di atas" : " · tunggu close di bawah"),
+                      ColorToARGB(InpArmedColor, 255), TA_RIGHT);
+      return;
+     }
+   color c = buy ? InpChochBuy : InpChochSell;
+   int x1, y1, x2, y2;
+   if(!XY(r.t1, r.p1, x1, y1) || !XY((datetime)r.p2, r.p1, x2, y2))
+      return;
+   if(x2 < 0 || x1 > g_w - 60)
+      return;
+   int xa = ClampX(x1), xb = MathMin(ClampX(x2), g_w - 60);
+   g_cv.LineHorizontal(xa, xb, y1, ColorToARGB(c, 240));
+   g_cv.LineHorizontal(xa, xb, y1 + (buy ? -1 : 1), ColorToARGB(c, 120));
+   if(x2 >= 0 && x2 < g_w - 60)
+      g_cv.FillCircle(x2, y1, 3, ColorToARGB(c, 255));
+   g_cv.TextOut((xa + xb) / 2, buy ? y1 - 14 : y1 + 2, (buy ? "CHoCH ▲" : "CHoCH ▼"), ColorToARGB(c, 255), TA_CENTER);
+  }
+
 void HLine(datetime t1, double p, color c, const string txt)
   {
    int x, y;
@@ -240,6 +284,11 @@ void Render()
          if(XY(r.t1, r.p2, x, y))
             g_cv.TextOut(g_w - 64, y - 13, "ARMED " + r.dir + " · tunggu CHoCH M5", ColorToARGB(InpArmedColor, 255),
                          TA_RIGHT);
+        }
+      else if(r.rec == "CHOCH")
+        {
+         if(InpShowChoch)
+            Choch(r);
         }
       else if(r.rec == "ORDER")
         {

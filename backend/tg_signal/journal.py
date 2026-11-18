@@ -308,7 +308,7 @@ def _skips(jur: pd.DataFrame) -> pd.DataFrame:
 
 # ── Excel ───────────────────────────────────────────────────────────────────
 WIDE = {"Alasan entry / skip": 48, "POI terdeteksi di zona": 40, "Alur status": 70, "Pesan sinyal": 40,
-        "Alasan entry": 48, "Alasan": 60}
+        "Alasan entry": 48, "Alasan": 60, "Keterangan": 80, "Setup": 48, "Alasan / entry": 60}
 PRICE_COLS = {"Harga saat sinyal", "ZERO", "LAST", "Entry", "SL", "TP", "Exit"}
 FILL = {"ENTRY": "D9F2D9", "SKIP": "EEEEEE", "MENUNGGU": "FFF2CC"}
 
@@ -339,7 +339,7 @@ def to_xlsx(frames: dict[str, pd.DataFrame]) -> bytes:
                     width = min(max([len(col)] + sample) + 2, 30)
                 ws.column_dimensions[letter].width = width
                 fmt = ("0.00" if col in PRICE_COLS else
-                       "yyyy-mm-dd hh:mm" if col.startswith("Jam") else
+                       "yyyy-mm-dd hh:mm" if col.startswith(("Jam", "Waktu")) else
                        "yyyy-mm-dd" if col == "Tanggal" else
                        "#,##0.00;[Red]-#,##0.00" if "USD" in col else
                        "0.0;[Red]-0.0" if col in ("Pips", "R") else None)

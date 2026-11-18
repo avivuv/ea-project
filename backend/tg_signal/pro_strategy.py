@@ -142,7 +142,8 @@ class Market:
 def run_side(mk: Market, cfg: Cfg, is_buy: bool, block: np.ndarray | None = None,
              final: dict | None = None) -> list[dict]:
     """Simulasi satu arah. block[i] = True → jam news: tidak cari setup / entry baru, pending dibatalkan.
-    final (dict) diisi state terakhir (dipakai runner live)."""
+    final (dict) diisi state terakhir (dipakai runner live), termasuk `chochs`: daftar CHoCH M5 yang terjadi
+    (swing_i, level, break_i, poi) — level dalam ruang arah (SELL = harga dinegasikan) — untuk marker chart."""
     O, H, L, C = mk.arr[is_buy]
     spr, n = mk.spr, mk.n
     bias, mid = mk.bias[(cfg.bias, is_buy)], mk.mid[is_buy]
@@ -156,6 +157,7 @@ def run_side(mk: Market, cfg: Cfg, is_buy: bool, block: np.ndarray | None = None
     state = "idle"
     day_key, n_day, loss_day = None, 0, 0
     s: dict = {}
+    chochs: list[tuple] = []
 
     def close_trade(i, r, why):
         nonlocal state, n_day, loss_day
@@ -224,11 +226,16 @@ def run_side(mk: Market, cfg: Cfg, is_buy: bool, block: np.ndarray | None = None
             # swing high M5 terakhir yang sudah dikenal sebelum low terendah
             lo_i = s["low_i"]
             k = next((k for k in range(lo_i - 1, max(s["arm_i"] - 40, 2), -1) if is_sh[k] and k + 2 <= i), None)
-            level = H[k] if k is not None else H[max(0, s["arm_i"] - 6):s["arm_i"] + 1].max()
+            if k is None:
+                k0 = max(0, s["arm_i"] - 6)
+                k = k0 + int(np.argmax(H[k0:s["arm_i"] + 1]))
+            level = H[k]
+            s["ch_k"], s["ch_lvl"] = k, level   # level CHoCH yang sedang ditunggu (marker chart)
             if i <= lo_i or C[i] <= level:
                 continue
             if block is not None and block[i]:
                 continue                        # news: tunda entry
+            chochs.append((k, level, i, s["poi"]))
             if cfg.min_pb:
                 w0 = max(0, i - PB_LOOKBACK)
                 hi_i = w0 + int(np.argmax(H[w0:i + 1]))
@@ -293,7 +300,7 @@ def run_side(mk: Market, cfg: Cfg, is_buy: bool, block: np.ndarray | None = None
         s = {"poi": best, "arm_i": i, "low": L[i], "low_i": i, "ref_low": ref}
         state = "armed"
     if final is not None:
-        final.update(state=state, s=dict(s), last_i=n - 2)
+        final.update(state=state, s=dict(s), last_i=n - 2, chochs=chochs)
     return trades
 
 

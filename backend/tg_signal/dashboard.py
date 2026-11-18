@@ -6,7 +6,8 @@ Pause semua (data/PAUSE). Pause = tanpa entry baru; posisi terbuka tetap dikelol
 Tab:
 - Saldo        : saldo, equity, margin, total floating & floating/P-L per metode (semua magic + manual).
 - Satu tab per metode dengan tampilan standar (method_tab): status · ringkasan · kartu per sub-metode ·
-  profit kumulatif · trade tutup · log. Tab EA sinyal Telegram punya tambahan sinyal hari ini & pesan grup.
+  profit kumulatif · trade tutup · log · download jurnal .xlsx. Tab EA sinyal Telegram punya tambahan
+  sinyal hari ini & pesan grup.
 
     python -m tg_signal.dashboard            # buka http://127.0.0.1:8080
     python -m tg_signal.dashboard --port 8081
@@ -521,23 +522,26 @@ def date_input(label: str, value: str):
     return inp
 
 
-def journal_card() -> None:
-    """Download jurnal trading (.xlsx): tiap sinyal + keputusan entry/skip + alasan + hasil trade."""
+def journal_card(g: Group) -> None:
+    """Download jurnal trading (.xlsx) metode ini. Telegram: tiap sinyal + keputusan entry/skip + alasan;
+    metode lain: trade MT5 per magic + setup/entry/skip dari log runner (method_journal)."""
     today = (datetime.now(timezone.utc) + WIB).date()
+    tg = g.key == "tg"
     with ui.element("div").classes("card w-full"):
         ui.label("Jurnal trading (.xlsx)").classes("label")
         ui.label("Tiap sinyal: keputusan ENTRY/SKIP + alasan, POI di zona, alur status, entry/SL/TP/exit, "
-                 "pips, USD, R, dan perkiraan hasil versi admin. Sheet ringkasan harian & alasan skip.") \
-            .classes("sub")
+                 "pips, USD, R, dan perkiraan hasil versi admin. Sheet ringkasan harian & alasan skip." if tg else
+                 "Trade (entry/SL/TP/exit, hasil, USD, R, durasi, alasan entry), setup → entry / tidak entry + "
+                 "alasan, kejadian log runner, ringkasan harian & per sub-metode.").classes("sub")
         with ui.row().classes("items-center gap-3 mt-2"):
             d_from = date_input("Dari (WIB)", today.replace(day=1).isoformat())
             d_to = date_input("Sampai (WIB)", today.isoformat())
-            mode = ui.select({"": "Semua mode", "DEMO": "DEMO", "LOG": "LOG (paper)"}, value="",
-                             label="Mode").props("dense outlined dark").classes("w-40")
-            incl = ui.checkbox("Ikutkan sinyal belum diproses")
+            if tg:
+                mode = ui.select({"": "Semua mode", "DEMO": "DEMO", "LOG": "LOG (paper)"}, value="",
+                                 label="Mode").props("dense outlined dark").classes("w-40")
+                incl = ui.checkbox("Ikutkan sinyal belum diproses")
 
             def download() -> None:
-                from tg_signal import journal
                 try:
                     start = datetime.strptime(d_from.value, "%Y-%m-%d").date() if d_from.value else None
                     end = datetime.strptime(d_to.value, "%Y-%m-%d").date() if d_to.value else None
@@ -545,7 +549,13 @@ def journal_card() -> None:
                     ui.notify("Format tanggal harus YYYY-MM-DD", type="negative")
                     return
                 try:
-                    data, name = journal.export(start, end, mode.value or None, incl.value)
+                    if tg:
+                        from tg_signal import journal
+                        data, name = journal.export(start, end, mode.value or None, incl.value)
+                    else:
+                        from tg_signal import method_journal as mj
+                        data, name = mj.export(g.tab, [mj.Spec(m.id, m.symbol, m.magic, m.log)
+                                                       for m in g.methods], start, end)
                 except Exception as e:
                     ui.notify(f"Gagal membuat jurnal: {e}", type="negative")
                     return
@@ -569,7 +579,6 @@ def telegram_extra() -> Callable[[], None]:
         with ui.element("div").classes("card flex-1 min-w-[320px]"):
             ui.label("Pesan Telegram terakhir").classes("label")
             feed = ui.label("").classes("logbox")
-    journal_card()
 
     status_txt = {"NEW": "◌ BARU", "OPEN": "● OPEN", "PENDING": "◷ PENDING", "WAITING": "◌ TUNGGU POI",
                   "CLOSED": "✓ CLOSED", "REJECTED": "✕ DITOLAK", "EXPIRED": "⌛ HANGUS", "CANCELLED": "⊘ BATAL"}
@@ -714,6 +723,7 @@ def build(start_tab: str = "") -> None:
                 if g.key == "tg":
                     tg_ref = telegram_extra()
                     refreshers.append(lambda _snap: tg_ref())
+                journal_card(g)
 
     def toggle_pause() -> None:
         if settings.PAUSE_FILE.exists():
