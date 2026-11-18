@@ -65,7 +65,8 @@ TG_MAX_ZONE_DISTANCE = _f("TG_MAX_ZONE_DISTANCE", 15.0)   # dalam $ harga
 TG_ZONE_WIDTH_MIN = _f("TG_ZONE_WIDTH_MIN", 1)
 TG_ZONE_WIDTH_MAX = _f("TG_ZONE_WIDTH_MAX", 10)
 TG_DUPLICATE_WINDOW_SEC = _i("TG_DUPLICATE_WINDOW_SEC", 0)   # 0 = tanpa filter duplikat (16 Nov 2026: user minta semua sinyal diproses)
-TG_POLL_SEC = _f("TG_POLL_SEC", 3)          # cek aktif pesan baru (push Telegram bisa telat ±60 dtk)
+TG_EDIT_MAX_SEC = _i("TG_EDIT_MAX_SEC", 600)  # edit sinyal (typo dibenerin admin) diproses ulang bila ≤ ini dari waktu kirim
+TG_POLL_SEC = _f("TG_POLL_SEC", 3)         # cek aktif pesan baru (push Telegram bisa telat ±60 dtk)
 
 # ── Eksekusi (Tahap 4, akun demo) ───────────────────────────────────────────
 # ZONE (keputusan user 12 Nov 2026): sudah di zona → market, belum → pending limit di ZERO,
@@ -98,7 +99,18 @@ TG_TP_PIPS = _f("TG_TP_PIPS", 30)                       # TP = SL = 30 pips (kep
 TG_SL_FROM = os.getenv("TG_SL_FROM", "entry")           # entry | zone (LAST − SL)
 TG_MAGIC = _i("TG_MAGIC", 990011)                       # penanda order milik program ini
 TG_DEVIATION_POINTS = _i("TG_DEVIATION_POINTS", 50)     # toleransi slippage (50 point = $0.05)
-PAUSE_FILE = DATA_DIR / "PAUSE"                         # kill switch: file ada → tidak buka order
+PAUSE_FILE = DATA_DIR / "PAUSE"                         # kill switch GLOBAL: file ada → semua metode tidak buka order
+# Pause per metode (18 Nov 2026): file ada → metode itu tidak buka order baru; posisi terbuka tetap dikelola.
+PAUSE_TG = DATA_DIR / "PAUSE_TG"                        # EA sinyal Telegram (run_live)
+PAUSE_PRO = DATA_DIR / "PAUSE_PRO"                      # SMC Top-Down (pro_live)
+PAUSE_ORB = DATA_DIR / "PAUSE_ORB"                      # ORB NY, semua instrumen (orb_live)
+PAUSE_SWING = DATA_DIR / "PAUSE_SWING"                  # swing Donchian (intraday.swing_live)
+PAUSE_BUMI = DATA_DIR / "PAUSE_BUMI"                    # BUMI 4 MA (bumi_live)
+
+
+def is_paused(method_file: Path) -> bool:
+    """True bila pause global atau pause metode itu aktif."""
+    return PAUSE_FILE.exists() or method_file.exists()
 
 # ── Risk ────────────────────────────────────────────────────────────────────
 TG_LOT = _f("TG_LOT", 0.01)

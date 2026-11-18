@@ -138,7 +138,8 @@ class Store:
     def upsert_signal(self, message_id: int, received: datetime, direction: str,
                       level_first: int, level_last: int, sl_pips: float,
                       flags: list[str] | None = None) -> int:
-        """Sinyal baru, atau update bila pesan diedit dan status masih NEW/WAITING."""
+        """Sinyal baru, atau update bila pesan diedit dan sinyal belum pernah jadi posisi
+        (NEW/WAITING/REJECTED/CANCELLED → kembali NEW). PENDING harus dibatalkan pemanggil dulu."""
         row = self.conn.execute(
             "SELECT id, status FROM signals WHERE message_id=?", (message_id,)
         ).fetchone()
@@ -151,7 +152,7 @@ class Store:
             )
             self.conn.commit()
             return cur.lastrowid
-        if row["status"] in ("NEW", "WAITING"):
+        if row["status"] in ("NEW", "WAITING", "REJECTED", "CANCELLED"):
             self.conn.execute(
                 """UPDATE signals SET direction=?, level_first=?, level_last=?, sl_pips=?,
                    ref_price=NULL, zero=NULL, last=NULL, flags=?, status='NEW', status_reason='edited'
@@ -193,7 +194,7 @@ class Store:
 
     def signal_for_message(self, chat_id: int, msg_id: int) -> sqlite3.Row | None:
         return self.conn.execute(
-            """SELECT s.* FROM signals s JOIN messages m ON m.id = s.message_id
+            """SELECT s.*, m.text AS msg_text FROM signals s JOIN messages m ON m.id = s.message_id
                WHERE m.chat_id=? AND m.msg_id=?""", (chat_id, msg_id)).fetchone()
 
     def recent_duplicate(self, sig: sqlite3.Row, window_sec: int) -> bool:

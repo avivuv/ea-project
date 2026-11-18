@@ -9,8 +9,8 @@ Aturan (settings.py, bisa di-override via .env):
 - TG_ENTRY_MODE=ZONE (opsional): harga sudah di zona → market; belum → pending limit di ZERO.
   SL = LAST ∓ TG_SL_PIPS, TP = entry ± TG_TP_PIPS. Pending hangus (karena TP) hanya bila admin bilang
   TP di chat (Report / pesan singkat), bukan dari harga; sinyal baru menggantikan pending lama. Lihat entry_plan.py.
-- Hanya pesan baru (bukan edit), 1 sinyal = 1 posisi, tanpa layering, lot TG_LOT.
-- Risk check: lihat risk.py. Kill switch: buat file tg_signal/data/PAUSE.
+- Pesan baru + edit sinyal ≤ TG_EDIT_MAX_SEC yang belum jadi posisi (typo dibenerin admin → diproses ulang), 1 sinyal = 1 posisi, tanpa layering, lot TG_LOT.
+- Risk check: lihat risk.py. Pause: file tg_signal/data/PAUSE (global) atau PAUSE_TG.
 - Akun non-demo ditolak oleh executor.
 """
 from __future__ import annotations
@@ -27,7 +27,7 @@ from tg_signal.detectors.poi import zone_pois
 from tg_signal.entry_plan import limit_filled, plan_entry, plan_poi
 from tg_signal.executor import MT5Executor
 from tg_signal.ingest import ingest_message
-from tg_signal.parser import is_admin_tp, parse_report
+from tg_signal.parser import is_admin_tp, parse_report, parse_signal
 from tg_signal.price_resolver import resolve_zone
 from tg_signal.risk import RiskLimits, RiskState, check, target_hit
 from tg_signal.store import Store
@@ -77,7 +77,7 @@ class LiveTrader:
         n_today, pnl_today = self.store.day_stats(day_start_utc(now), self.mode)
         opens = [(t["direction"], 0.0) for t in self.store.open_trades(self.mode)]
         st = RiskState(spread_pips=tick.spread / PIP, open_positions=opens, trades_today=n_today,
-                       pnl_today_usd=pnl_today, paused=settings.PAUSE_FILE.exists(), price_age_sec=tick.age_sec)
+                       pnl_today_usd=pnl_today, paused=settings.is_paused(settings.PAUSE_TG), price_age_sec=tick.age_sec)
         ok, reason = check(sig["direction"], zone.zero, zone.distance, st, limits())
         desc = f"{sig['direction']} {sig['level_first']:02d}-{sig['level_last']:02d} → zona {zone.zero:.0f}/{zone.last:.0f}"
         if not ok:
@@ -137,6 +137,25 @@ class LiveTrader:
             entry = tick.ask if g == 1 else tick.bid
             ticket, sl, tp, t_open = None, entry - g * sl_dist, entry + g * tp_dist, now
         self._record_open(sid, msg_id, sig["direction"], desc, ticket, t_open, entry, sl, tp)
+
+    def before_signal_edit(self, chat_id: int, msg_id: int, new_text: str) -> None:
+        """Pesan sinyal diedit (typo dibenerin admin): batalkan pending sinyal itu agar bisa diproses ulang
+        dengan angka baru. Status lain ditangani Store.upsert_signal (OPEN/CLOSED tidak diubah)."""
+        sig = self.store.signal_for_message(chat_id, msg_id)
+        if sig is None or sig["status"] != "PENDING" or (sig["msg_text"] or "").strip() == new_text.strip():
+            return
+        for p in self._pendings():
+            if p["sid"] != sig["id"]:
+                continue
+            if p["ticket"] is not None and self.mode == "DEMO":
+                if p["ticket"] in self.ex.pending_tickets() and not self.ex.cancel_order(p["ticket"]):
+                    log.error("gagal membatalkan pending %s (sinyal diedit)", p["ticket"])
+                    return
+                if self.ex.position_of(p["ticket"]) or self.ex.entry_deal(p["ticket"]):
+                    return          # sudah terisi → posisi tetap, edit diabaikan
+            self.store.set_status(sig["id"], "CANCELLED", "pesan diedit admin")
+            log.info("pending %s %s @ %.2f dibatalkan: pesan sinyal #%s diedit", p["ticket"] or "paper",
+                     p["direction"], p["price"], msg_id)
 
     # ── mode POI ────────────────────────────────────────────────────────────
     def _zone_pois(self, direction, zero, last) -> list[tuple[float, float, str]]:
@@ -247,14 +266,44 @@ class LiveTrader:
             self._record_open(sid, msg_id, direction, desc + " | di zona → market", None,
                               datetime.now(timezone.utc), entry, sl, entry + g * settings.TG_TP_PIPS * PIP)
 
+    def _crossed(self, direction, limit, sl) -> tuple[bool, object]:
+        """Harga terbaru sudah menembus harga limit (BUY: ask ≤ limit) tapi belum lewat SL → (True, tick)."""
+        try:
+            tk = self.ex.tick()
+        except RuntimeError:
+            return False, None
+        g = 1 if direction == "BUY" else -1
+        fill_px, exit_px = (tk.ask, tk.bid) if g == 1 else (tk.bid, tk.ask)
+        return g * (fill_px - limit) <= 0 and g * (exit_px - sl) > 0, tk
+
     def _place_pending(self, sid, msg_id, direction, plan, desc) -> None:
-        """Belum sampai zona → pending limit di ZERO."""
+        """Pending limit di harga rencana (POI / ZERO).
+        Harga bergerak cepat dan sudah menembus limit sebelum order sampai (MT5 menolak BUY LIMIT di atas ask,
+        kasus 18 Nov 2026 BUY 72-68: retcode 10006 'bad stops') → entry market, sama dengan limit yang terisi
+        (SL/TP tetap dari harga limit). Gagal karena sebab lain → sinyal kembali WAITING (dicoba lagi bar
+        berikutnya) bila mode POI, selain itu REJECTED."""
         ticket = None
         if self.mode == "DEMO":
+            crossed, tk = self._crossed(direction, plan.price, plan.sl)
+            if crossed:
+                log.info("sinyal #%s %s | harga sudah menembus limit %.2f → entry market", msg_id, desc, plan.price)
+                self._open_market(sid, msg_id, direction, desc, sl=plan.sl, tp=plan.tp, tick=tk)
+                return
             try:
                 ticket = self.ex.place_limit(direction, settings.TG_LOT, plan.price, plan.sl, plan.tp,
                                              comment=f"tg{msg_id}")
             except RuntimeError as e:
+                crossed, tk = self._crossed(direction, plan.price, plan.sl)
+                if crossed:
+                    log.info("sinyal #%s %s | pending ditolak (%s), harga sudah menembus limit %.2f → entry market",
+                             msg_id, desc, e, plan.price)
+                    self._open_market(sid, msg_id, direction, desc, sl=plan.sl, tp=plan.tp, tick=tk)
+                    return
+                if settings.TG_ENTRY_MODE == "POI":
+                    self.store.set_status(sid, "WAITING", f"pending gagal, coba lagi: {e}")
+                    log.error("sinyal #%s %s | PENDING GAGAL: %s → WAITING, dicoba lagi bar berikutnya",
+                              msg_id, desc, e)
+                    return
                 self.store.set_status(sid, "REJECTED", f"ORDER_FAILED: {e}")
                 log.error("sinyal #%s %s | PENDING GAGAL: %s", msg_id, desc, e)
                 return
@@ -576,6 +625,12 @@ async def run(mode: str) -> None:
             state["last_id"] = max(state["last_id"], msg.id)
         report = parse_report((msg.message or "").strip())
         prev_lines = store.max_report_lines(report.report_date.isoformat()) if report else 0
+        fresh_edit = is_edit and (datetime.now(timezone.utc) - msg.date).total_seconds() <= settings.TG_EDIT_MAX_SEC
+        if fresh_edit and not report and parse_signal(msg.message or ""):
+            try:
+                trader.before_signal_edit(entity.id, msg.id, msg.message or "")
+            except Exception:
+                log.exception("gagal membatalkan pending sinyal diedit #%s", msg.id)
         kind = ingest_message(store, entity.id, msg.id, msg.date, msg.message or "", msg.edit_date,
                               settings.TG_DEFAULT_SL_PIPS, msg.sender_id, _sender_name(msg))
         if kind == "UNCHANGED":
@@ -583,7 +638,9 @@ async def run(mode: str) -> None:
         lag = (datetime.now(timezone.utc) - msg.date).total_seconds()
         first = (msg.message or "").strip().splitlines()[0][:50] if msg.message else ""
         log.info("pesan #%s [%s] via %s, jeda %.0f dtk | %s", msg.id, kind, via, lag, first)
-        if kind == "SIGNAL" and not is_edit:
+        if kind == "SIGNAL" and (not is_edit or fresh_edit):
+            if is_edit:
+                log.info("sinyal #%s diedit admin → diproses ulang dengan angka baru", msg.id)
             try:
                 trader.handle_signal(entity.id, msg.id)
             except Exception:  # jangan sampai listener mati karena satu sinyal
@@ -613,6 +670,7 @@ async def run(mode: str) -> None:
                 msgs = await client.get_messages(entity, limit=5, reply_to=settings.TG_TOPIC_ID or None)
                 for m in sorted(msgs, key=lambda x: x.id):
                     process(m, "poll", False)
+                (settings.DATA_DIR / "heartbeat").touch()     # dashboard: runner hidup walau grup sepi
             except errors.FloodWaitError as e:
                 log.warning("FloodWait %s dtk dari Telegram, polling dijeda", e.seconds)
                 await asyncio.sleep(e.seconds + 1)

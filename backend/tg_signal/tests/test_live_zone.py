@@ -155,3 +155,45 @@ def test_log_mode_paper_pending_fills(env):
     assert status(store, 1) == "OPEN"
     t, = store.open_trades("LOG")
     assert t["entry"] == 3974.0 and t["sl"] == pytest.approx(3967.0)
+
+
+def test_pending_rejected_after_price_crossed_limit_goes_market(env, monkeypatch):
+    """Kasus 18 Nov 2026 BUY 72-68: limit POI 3772.35 dikirim, harga keburu turun ke bawah limit → MT5 menolak
+    (retcode 10006). Harus entry market (setara limit terisi), bukan sinyal ditolak."""
+    store, ex = env
+    monkeypatch.setattr(settings, "TG_ENTRY_MODE", "POI")
+    tr = run_live.LiveTrader(store, ex, "DEMO")
+    add_signal(store, 1, "BUY", 72, 68)
+    sid = store.signal_for_message(CHAT, 1)["id"]
+    plan = run_live.plan_poi("BUY", 3772.0, 3768.0, 3772.24, 3772.40, [(3772.35, 3770.16, "OB")],
+                             3.0, 3.0, allow_market=False, fallback="NONE")
+    assert plan.kind == "LIMIT" and plan.price == 3772.35
+
+    def reject(*a, **k):
+        ex.set(3771.42)                     # harga turun saat order dikirim
+        raise RuntimeError("pending gagal (retcode=10006): bad stops")
+
+    ex.set(3772.24)
+    monkeypatch.setattr(ex, "place_limit", reject)
+    tr._place_pending(sid, 1, "BUY", plan, "BUY 72-68")
+    assert status(store, 1) == "OPEN"
+    t, = store.open_trades("DEMO")
+    assert t["sl"] == pytest.approx(3769.35) and t["tp"] == pytest.approx(3775.35)
+
+
+def test_pending_failed_other_reason_back_to_waiting(env, monkeypatch):
+    store, ex = env
+    monkeypatch.setattr(settings, "TG_ENTRY_MODE", "POI")
+    tr = run_live.LiveTrader(store, ex, "DEMO")
+    add_signal(store, 1, "BUY", 72, 68)
+    sid = store.signal_for_message(CHAT, 1)["id"]
+    plan = run_live.plan_poi("BUY", 3772.0, 3768.0, 3772.84, 3773.0, [(3772.35, 3770.16, "OB")],
+                             3.0, 3.0, allow_market=False, fallback="NONE")
+    ex.set(3772.84)
+
+    def fail(*a, **k):
+        raise RuntimeError("pending gagal (retcode=10004): requote")
+
+    monkeypatch.setattr(ex, "place_limit", fail)
+    tr._place_pending(sid, 1, "BUY", plan, "BUY 72-68")
+    assert status(store, 1) == "WAITING"

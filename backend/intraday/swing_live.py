@@ -43,7 +43,7 @@ METHODS = [  # (id, simbol, nama variasi di intraday.swing, magic)
 STATE_PATH = settings.DATA_DIR / "swing_state.json"
 LOG_PATH = settings.DATA_DIR / "swing_live.log"
 HEARTBEAT = settings.DATA_DIR / "swing_heartbeat"
-PAUSE_FILE = settings.DATA_DIR / "PAUSE_SWING"      # ada → tidak ada entry baru (trailing tetap jalan)
+PAUSE_FILE = settings.PAUSE_SWING    # ada (atau PAUSE global) → tidak ada entry baru (trailing tetap jalan)
 VARIANTS = {v.name: v for v in sw.variants()}
 
 
@@ -234,7 +234,7 @@ def step(bk: Broker, st: dict, dry: bool = False) -> None:
             if t_sig != now_bar or st["last_signal"].get(mid) == str(t_sig):
                 continue                                   # bukan sinyal di batas bar ini / sudah diproses
             st["last_signal"][mid] = str(t_sig)
-            if PAUSE_FILE.exists():
+            if settings.is_paused(PAUSE_FILE):
                 log(f"[{mid}] PAUSE: sinyal {t_sig:%Y-%m-%d %H:%M}Z dilewati")
                 continue
             dr, sl_dist = int(row.dir), float(row.sl_dist)

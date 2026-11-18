@@ -14,7 +14,7 @@ persis dengan backtest (pro_strategy.run_side). Bila simulasi baru saja memasang
 market di bar terakhir → order yang sama dikirim ke MT5. Pending dibatalkan setelah 12 bar M5,
 bila harga sudah sampai level TP sebelum terisi, atau saat jendela news. SL/TP ikut di order.
 News: ±PRO_NEWS_MIN menit dari event HIGH impact USD (kalender Forex Factory minggu ini).
-Kill switch bersama: file data/PAUSE → tidak ada order baru.
+Pause: file data/PAUSE (global) atau data/PAUSE_PRO → tidak ada order baru.
 """
 from __future__ import annotations
 
@@ -163,7 +163,7 @@ class ProTrader:
         p = s["poi"]
         info = (f"{d} {kind} @ {price:.2f} SL {sl:.2f} TP {tp:.2f} (risiko {risk / settings.PIP_SIZE:.0f} pips) "
                 f"| POI M15 {p[4]}")
-        if in_news or settings.PAUSE_FILE.exists():
+        if in_news or settings.is_paused(settings.PAUSE_PRO):
             log.info("SETUP DILEWATI (%s): %s", "news" if in_news else "PAUSE", info)
             return
         # pending yang harganya sudah terlewati → market (simulasi juga akan terisi di open berikutnya)

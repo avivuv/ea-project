@@ -14,7 +14,7 @@ Konfigurasi per instrumen (SPECS; backtest 17 Nov 2026, orb.py / orb_deep.py):
   Semua  : entry market · posisi ditutup paksa 6 jam setelah NY buka · maks 1 trade per hari ·
            NY buka 21:30 WIB (musim dingin AS) / 20:30 WIB (musim panas), DST otomatis.
 Logika sinyal = orb.find_breakout / orb.bias_at / orb.plan_order (diverifikasi identik dengan backtest).
-Kill switch bersama: file data/PAUSE → tidak ada order baru.
+Pause: file data/PAUSE (global) atau data/PAUSE_ORB (semua instrumen ORB) → tidak ada order baru.
 Marker chart: tiap bar M5 baru ditulis Common\\Files\\orb_area.csv (XAUUSD) / orb_area_<simbol>.csv
 (range 5 hari terakhir, breakout, posisi) untuk indikator ProPOI (MT5).
 """
@@ -170,7 +170,7 @@ class OrbTrader:
             if not orb.bias_at(orb.h1_bias(h1), sig["close_time"], is_buy):
                 log.info("ORB %s %s: %s tapi bias EMA50 H1 tidak searah — dilewati (hari selesai)", sym, day, info)
                 return
-        if settings.PAUSE_FILE.exists():
+        if settings.is_paused(settings.PAUSE_ORB):
             log.info("ORB %s %s: %s — dilewati (PAUSE)", sym, day, info)
             return
         tick = self.ex.tick()

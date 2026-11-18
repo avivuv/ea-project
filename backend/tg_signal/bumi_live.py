@@ -17,7 +17,7 @@ Aturan = config terpilih di `tg_signal.bumi_deep` (fungsi `indicators` & `live_s
     python -m tg_signal.bumi_live --once       # status + satu kali cek tanpa order
     python -m tg_signal.bumi_live --status
 
-State: data/bumi_state.json · Log: data/bumi_live.log · Pause entry baru: file data/PAUSE_BUMI
+State: data/bumi_state.json · Log: data/bumi_live.log · Pause entry baru: file data/PAUSE_BUMI atau data/PAUSE (global)
 """
 from __future__ import annotations
 
@@ -47,7 +47,7 @@ TF_HOURS = {"1h": 1, "4h": 4}
 STATE_PATH = settings.DATA_DIR / "bumi_state.json"
 LOG_PATH = settings.DATA_DIR / "bumi_live.log"
 HEARTBEAT = settings.DATA_DIR / "bumi_heartbeat"
-PAUSE_FILE = settings.DATA_DIR / "PAUSE_BUMI"       # ada -> tidak ada entry baru (exit tetap jalan)
+PAUSE_FILE = settings.PAUSE_BUMI    # ada (atau PAUSE global) -> tidak ada entry baru (exit tetap jalan)
 
 
 def log(msg: str) -> None:
@@ -172,7 +172,7 @@ def step(bk: Broker, st: dict, dry: bool = False) -> None:
                 if d:
                     side = "BUY" if d > 0 else "SELL"
                     st["info"][mid]["last_signal"] = f"{side} {df.index[k]:%Y-%m-%d %H:%M}Z"
-                    if PAUSE_FILE.exists():
+                    if settings.is_paused(PAUSE_FILE):
                         log(f"[{mid}] PAUSE: sinyal {side} {df.index[k]:%Y-%m-%d %H:%M}Z dilewati")
                     else:
                         lot, risk = bk.lot_for(sym, sl_dist)

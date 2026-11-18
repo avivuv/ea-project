@@ -72,7 +72,7 @@ Level 3 digit = typo → `n % 100` + flag `LEVEL_TYPO`.
 | SELL: `level_first < level_last` setelah resolve | flag `ZONE_ORDER_SUSPECT`, tetap simpan |
 | Lebar zona 1–10 (normalnya 4) | flag `ZONE_WIDTH_SUSPECT` |
 | Jarak zona dari harga sekarang ≤ `TG_MAX_ZONE_DISTANCE` ($15) | status `REJECTED` |
-| Pesan diedit (Telegram edit event) | update sinyal bila status masih `WAITING`; bila sudah `OPEN` → log saja |
+| Pesan diedit (Telegram edit event) | sinyal yang **belum pernah jadi posisi** (`NEW`/`WAITING`/`PENDING`/`REJECTED`/`CANCELLED`) diganti angka baru lalu **diproses ulang** — pending lamanya dibatalkan dulu (18 Nov 2026, kasus typo `SELL 51-55` → `SELL 91-95`). Hanya edit ≤ `TG_EDIT_MAX_SEC` (600 dtk) dari waktu kirim; lebih lama → disimpan saja. Sudah `OPEN`/`CLOSED`/`EXPIRED` → log saja |
 | Pesan sama terkirim ulang (zona & arah sama) | **tetap diproses** (16 Nov 2026, keputusan user); filter lama bisa diaktifkan lagi dengan `TG_DUPLICATE_WINDOW_SEC=300` |
 
 ---

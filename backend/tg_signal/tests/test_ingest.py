@@ -43,6 +43,17 @@ def test_edit_ignored_after_open():
     assert (sig["level_first"], sig["status"]) == (62, "OPEN")
 
 
+def test_edit_reopens_rejected_signal():
+    """Typo SELL 51-55 ditolak (zona jauh), admin edit jadi SELL 91-95 → sinyal kembali NEW dengan angka baru."""
+    st = Store()
+    ingest_message(st, 1, 10, T0, "SELL 51-55")
+    [sig] = st.signals()
+    st.set_status(sig["id"], "REJECTED", "ZONE_TOO_FAR")
+    ingest_message(st, 1, 10, T0, "SELL 91-95", edit_date=T0)
+    [sig] = st.signals()
+    assert (sig["level_first"], sig["level_last"], sig["status"], sig["zero"]) == (91, 95, "NEW", None)
+
+
 def test_report_with_duplicate_numbers():
     st = Store()
     text = "Report Senin (09-11-2026)\n1. BUY 62-58 ✅ ZERO-TP\n1. SELL 42-46 ✅ MID-TP"
