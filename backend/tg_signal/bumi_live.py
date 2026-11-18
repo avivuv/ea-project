@@ -6,6 +6,9 @@ Aturan = config terpilih di `tg_signal.bumi_deep` (fungsi `indicators` & `live_s
   (buy) / bawah (sell) ketiga MA lain, dan EMA200 TF naik (buy) / turun (sell) dibanding 10 bar lalu.
 - Entry market di awal bar berikutnya. SL = 3 x ATR14 TF. Tanpa TP.
 - Exit: bar TF close dengan MA5 sudah di sisi berlawanan ketiga MA -> tutup market. Atau kena SL.
+- Breakeven (18 Nov 2026, studi `bumi_exit_study`): setelah bar TF close di mana harga sempat mencapai
+  +BE_R x jarak SL dari entry, SL dipindah ke harga entry. Bila harga sudah kembali melewati entry
+  (SL tidak bisa dipasang), posisi ditutup market — sama dengan backtest (stop kena di open bar berikutnya).
 - Bar yang sama dengan exit (SL / cross balik) tidak membuka posisi baru (sama dengan backtest).
 - 1 posisi per metode (magic number). Lot = RISK_PCT saldo; skip bila lot minimum berisiko > MAX_RISK_PCT.
   Tidak ada batas risiko gabungan dengan runner lain (keputusan user 17 Nov 2026: akun demo, kumpulkan data).
@@ -26,7 +29,7 @@ from datetime import datetime, timezone
 
 import pandas as pd
 
-from intraday.swing_live import Broker as _SwingBroker
+from intraday.swing_live import Broker as _SwingBroker, sl_valid
 from tg_signal import settings
 from tg_signal.bumi_deep import indicators, live_signal
 from tg_signal.dndfx_backtest import resample
@@ -34,6 +37,7 @@ from tg_signal.dndfx_backtest import resample
 RISK_PCT = 0.5
 MAX_RISK_PCT = 5.0      # hanya pengaman nilai aneh; lot min 0.01 di XAU H4 sudah ~1.7% (SL ~$80, saldo ~$5k)
 SL_ATR = 3.0
+BE_R = 0.5              # SL -> entry setelah harga sempat +0.5R (None = matikan)
 POLL_SEC = 30
 METHODS = [  # (id, simbol, TF, magic)
     ("XAU_H4_BUMI", "XAUUSD", "4h", 26111701),
@@ -86,6 +90,18 @@ def closed_tf(h1: pd.DataFrame, tf: str, now_bar: pd.Timestamp) -> pd.DataFrame:
     return df[df.index + pd.Timedelta(hours=TF_HOURS[tf]) <= now_bar]
 
 
+def be_reached(df: pd.DataFrame, entry_bar: str, entry: float, d: int, sl_dist: float,
+               be_r: float | None = BE_R) -> bool:
+    """True bila sejak bar setelah bar sinyal (entry_bar) harga sempat bergerak >= be_r x sl_dist searah posisi."""
+    if be_r is None or not sl_dist > 0:
+        return False
+    after = df[df.index > pd.Timestamp(entry_bar)]
+    if after.empty:
+        return False
+    best = after.high.max() - entry if d > 0 else entry - after.low.min()
+    return best >= be_r * sl_dist
+
+
 def snapshot(ind: dict, df: pd.DataFrame, k: int) -> dict:
     a, b, e, f = (float(x[k]) for x in ind["ma"])
     st = "MA5 di atas semua" if ind["up"][1][k] else "MA5 di bawah semua" if ind["up"][-1][k] else "campur"
@@ -131,8 +147,22 @@ def step(bk: Broker, st: dict, dry: bool = False) -> None:
                     log(f"[{mid}] EXIT cross MA #{pos.ticket} {'BUY' if d > 0 else 'SELL'} P/L {pos.profit:+.2f} "
                         f"(bar {df.index[k]:%Y-%m-%d %H:%M}Z close {df.close.iloc[k]:.3f})")
                     exited = True
+                elif not info.get("be") and be_reached(df, info["entry_bar"], pos.price_open, d, info["sl_dist"]):
+                    tag = f"[{mid}] BREAKEVEN #{pos.ticket} (sempat +{BE_R}R): SL {pos.sl} -> {pos.price_open}"
+                    ok, why = sl_valid(bk, pos, pos.price_open, d > 0)
+                    if dry:
+                        log(f"(dry) {tag}" + ("" if ok else f" — tidak bisa ({why}) -> akan tutup market"))
+                    elif ok:
+                        bk.modify_sl(pos, pos.price_open)
+                        info["be"] = True
+                        log(tag)
+                    else:
+                        bk.close(pos, f"bumi {mid} BE")
+                        st["positions"].pop(mid, None)
+                        log(f"{tag} tidak bisa ({why}) -> tutup market P/L {pos.profit:+.2f}")
+                        exited = True
             elif info is not None:
-                log(f"[{mid}] posisi #{info['ticket']} sudah tertutup (SL)")
+                log(f"[{mid}] posisi #{info['ticket']} sudah tertutup ({'BE/SL' if info.get('be') else 'SL'})")
                 st["positions"].pop(mid, None)
                 exited = True
 
@@ -189,7 +219,7 @@ def main() -> None:
             step(bk, st, dry=True)
         return
     log(f"START bumi_live: {', '.join(m[0] for m in METHODS)} · risiko {RISK_PCT}%/trade "
-        f"(skip bila > {MAX_RISK_PCT}%) · SL {SL_ATR} ATR · akun DEMO")
+        f"(skip bila > {MAX_RISK_PCT}%) · SL {SL_ATR} ATR · BE {BE_R}R · akun DEMO")
     last_seen: dict[str, str] = {}
     while True:
         try:
