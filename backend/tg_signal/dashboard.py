@@ -512,6 +512,48 @@ def method_tab(g: Group, refresh_all: Callable[[], None]) -> Callable[[dict], No
     return refresh
 
 
+def date_input(label: str, value: str):
+    with ui.input(label, value=value).props("dense outlined dark").classes("w-40") as inp:
+        with ui.menu().props("no-parent-event") as menu:
+            ui.date(mask="YYYY-MM-DD").bind_value(inp).on("update:model-value", menu.close)
+        with inp.add_slot("append"):
+            ui.icon("edit_calendar").on("click", menu.open).classes("cursor-pointer")
+    return inp
+
+
+def journal_card() -> None:
+    """Download jurnal trading (.xlsx): tiap sinyal + keputusan entry/skip + alasan + hasil trade."""
+    today = (datetime.now(timezone.utc) + WIB).date()
+    with ui.element("div").classes("card w-full"):
+        ui.label("Jurnal trading (.xlsx)").classes("label")
+        ui.label("Tiap sinyal: keputusan ENTRY/SKIP + alasan, POI di zona, alur status, entry/SL/TP/exit, "
+                 "pips, USD, R, dan perkiraan hasil versi admin. Sheet ringkasan harian & alasan skip.") \
+            .classes("sub")
+        with ui.row().classes("items-center gap-3 mt-2"):
+            d_from = date_input("Dari (WIB)", today.replace(day=1).isoformat())
+            d_to = date_input("Sampai (WIB)", today.isoformat())
+            mode = ui.select({"": "Semua mode", "DEMO": "DEMO", "LOG": "LOG (paper)"}, value="",
+                             label="Mode").props("dense outlined dark").classes("w-40")
+            incl = ui.checkbox("Ikutkan sinyal belum diproses")
+
+            def download() -> None:
+                from tg_signal import journal
+                try:
+                    start = datetime.strptime(d_from.value, "%Y-%m-%d").date() if d_from.value else None
+                    end = datetime.strptime(d_to.value, "%Y-%m-%d").date() if d_to.value else None
+                except ValueError:
+                    ui.notify("Format tanggal harus YYYY-MM-DD", type="negative")
+                    return
+                try:
+                    data, name = journal.export(start, end, mode.value or None, incl.value)
+                except Exception as e:
+                    ui.notify(f"Gagal membuat jurnal: {e}", type="negative")
+                    return
+                ui.download.content(data, name)
+
+            ui.button("Download jurnal", icon="download", on_click=download).props("unelevated color=primary")
+
+
 def telegram_extra() -> Callable[[], None]:
     """Bagian khusus EA sinyal Telegram: sinyal hari ini & pesan grup terakhir."""
     with ui.row().classes("w-full gap-3 items-start no-wrap max-md:flex-wrap"):
@@ -527,6 +569,7 @@ def telegram_extra() -> Callable[[], None]:
         with ui.element("div").classes("card flex-1 min-w-[320px]"):
             ui.label("Pesan Telegram terakhir").classes("label")
             feed = ui.label("").classes("logbox")
+    journal_card()
 
     status_txt = {"NEW": "◌ BARU", "OPEN": "● OPEN", "PENDING": "◷ PENDING", "WAITING": "◌ TUNGGU POI",
                   "CLOSED": "✓ CLOSED", "REJECTED": "✕ DITOLAK", "EXPIRED": "⌛ HANGUS", "CANCELLED": "⊘ BATAL"}

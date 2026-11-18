@@ -40,7 +40,8 @@ $py = "C:\laragon\bin\python\python-3.10\python.exe"
 & $py -m tg_signal.executor --check         # cek akun demo, Algo Trading, harga
 & $py -m tg_signal.run_live --mode DEMO     # live di akun demo: entry market (TG_ENTRY_MODE=ZONE → market/pending limit)
 & $py -m tg_signal.bumi_live --once        # runner BUMI 4 MA XAU H4+H1 (demo); tanpa --once = jalan terus
-& $py -m tg_signal.dashboard               # monitoring http://127.0.0.1:8080
+& $py -m tg_signal.dashboard               # monitoring http://127.0.0.1:8080 (tab Telegram: download jurnal .xlsx)
+& $py -m tg_signal.journal --from 2026-11-11 --mode DEMO   # jurnal trading sinyal TG → data/jurnal_tg_*.xlsx
 ```
 
 ## Env (`backend/.env`)
