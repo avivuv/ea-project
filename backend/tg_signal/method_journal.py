@@ -1,5 +1,5 @@
 """
-Jurnal trading metode non-Telegram (Swing Donchian, BUMI 4 MA, SMC Top-Down, ORB NY) → file Excel (.xlsx).
+Jurnal trading metode non-Telegram (Swing Donchian, Trend MA Cross, SMC Top-Down, ORB NY) → file Excel (.xlsx).
 
 Sumber:
 - Trade: histori deal & order MT5 per magic (entry, SL/TP awal, exit, alasan tutup, USD, R, durasi) +
@@ -337,7 +337,7 @@ def export(title: str, specs: list[Spec], start: date | None = None, end: date |
 def main() -> None:
     from tg_signal.dashboard import GROUPS                          # konfigurasi metode ada di dashboard
     groups = {g.key: g for g in GROUPS if g.key != "tg"}
-    ap = argparse.ArgumentParser(description="Ekspor jurnal trading metode (Swing/BUMI/SMC/ORB) ke .xlsx")
+    ap = argparse.ArgumentParser(description="Ekspor jurnal trading metode (Swing/MA Cross/SMC/ORB) ke .xlsx")
     ap.add_argument("--group", required=True, choices=sorted(groups))
     ap.add_argument("--from", dest="start", type=date.fromisoformat, help="tanggal awal WIB (YYYY-MM-DD)")
     ap.add_argument("--to", dest="end", type=date.fromisoformat, help="tanggal akhir WIB (YYYY-MM-DD)")

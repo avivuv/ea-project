@@ -8,7 +8,13 @@ Aturan sama persis dengan backtest `intraday.swing` (fungsi `signals` yang sama)
 
 Per metode maksimal 1 posisi (dibedakan lewat magic number). Tidak menyentuh posisi EA scalping.
 - Entry: market di awal bar H1 pertama setelah bar TF sinyal close.
-- SL awal = 2 × ATR(14) TF sinyal; trailing chandelier diperbarui tiap bar H1 close; tanpa TP.
+- SL awal = 2 × ATR(14) TF sinyal; tanpa TP. Exit per metode (`EXITS`, studi `intraday.swing_exit_study`
+  20 Nov 2026), diperbarui tiap bar H1 close, SL hanya bergeser searah profit:
+    trail K   chandelier: ekstrem bid sejak bar entry − K × ATR (ATR saat entry, atau ATR TF terbaru bila live)
+    be X      SL → harga entry setelah harga sempat +X R
+  Bila harga sudah melewati level SL baru (tidak bisa dipasang) → tutup market (= backtest: stop kena di open
+  bar berikutnya). Bila hanya terlalu dekat (stops level broker) → ditunda.
+- Metode di `ENTRY_OFF`: tidak membuka posisi baru (posisi yang masih ada tetap dikelola).
 - Lot = risiko RISK_PCT saldo; bila lot minimum berisiko > MAX_RISK_PCT → entry di-skip (dicatat).
 State: tg_signal/data/swing_state.json · Log: tg_signal/data/swing_live.log
 """
@@ -34,12 +40,24 @@ H1_BARS = 20000
 POLL_SEC = 30
 DEVIATION = 100
 
-METHODS = [  # (id, simbol, nama variasi di intraday.swing, magic)
+METHODS = [  # (id, simbol, nama variasi di intraday.swing — dipakai untuk SINYAL, magic)
     ("XAU_D1_DON20", "XAUUSD", "DONCHIAN_D1_n20_SL2ATR_trail3_trD1", 26111201),
     ("XAU_H4_DON55", "XAUUSD", "DONCHIAN_H4_n55_SL2ATR_trail4_trD1", 26111202),
     ("BTC_H4_DON55", "BTCUSD", "DONCHIAN_H4_n55_SL2ATR_trail4_trD1", 26111203),
     ("JPY_H4_DON55", "USDJPY", "DONCHIAN_H4_n55_SL2ATR_trail4_trD1", 26111204),
 ]
+# Exit per metode (20 Nov 2026, studi swing_exit_study; sebelumnya trail3 / trail4 ATR saat entry):
+#   XAU D1  tr3_live  avgR 0.450 → 0.495, PF 2.13 → 2.37, DD 8.8 → 8.1R
+#   XAU H4  be1_tr5   avgR 0.285 → 0.430, PF 1.51 → 2.00, DD 19.4 → 15.9R
+#   BTC H4  tr6_live  avgR 0.131 → 0.521, PF 1.21 → 1.73 (latih tetap tipis)
+#   JPY H4  tidak ada exit yang kokoh → entry baru dimatikan
+EXITS = {
+    "XAU_D1_DON20": {"trail": 3, "live": True},
+    "XAU_H4_DON55": {"trail": 5, "be": 1},
+    "BTC_H4_DON55": {"trail": 6, "live": True},
+    "JPY_H4_DON55": {"trail": 4},
+}
+ENTRY_OFF = {"JPY_H4_DON55"}
 STATE_PATH = settings.DATA_DIR / "swing_state.json"
 LOG_PATH = settings.DATA_DIR / "swing_live.log"
 HEARTBEAT = settings.DATA_DIR / "swing_heartbeat"
@@ -152,22 +170,45 @@ class Broker:
             raise RuntimeError(f"close gagal #{pos.ticket}")
 
 
-def trail_sl(pos, h1: pd.DataFrame, info: dict, v: sw.V, is_buy: bool, digits: int) -> float | None:
-    """SL chandelier baru (sama dengan backtest): ekstrem bid sejak bar entry − trail. None = tidak berubah.
+def tf_atr_now(h1: pd.DataFrame, tf: str, now_bar: pd.Timestamp) -> float:
+    """ATR(14) bar TF terakhir yang SUDAH close per open bar H1 `now_bar` (= `atr_o[j+1]` di swing_exit_study)."""
+    b = sw.resample(h1, tf)
+    b = b[b.index + pd.Timedelta(sw.RULES[tf]) <= now_bar]
+    return float(sw.atr(b).iloc[-1]) if len(b) else float("nan")
 
+
+def trail_sl(pos, h1: pd.DataFrame, info: dict, spec: dict, sl_atr: float, is_buy: bool, digits: int,
+             atr_now: float | None = None) -> float | None:
+    """SL baru menurut aturan exit `spec` (sama dengan swing_exit_study.simulate). None = tidak berubah.
+
+    - trail K: ekstrem bid sejak bar entry ∓ K × ATR (ATR saat entry = sl_dist / sl_atr, atau `atr_now` bila live)
+    - be X: harga entry bila harga sempat +X × sl_dist
     Dibandingkan SETELAH dibulatkan ke digit simbol: tanpa ini SL yang secara pembulatan sama dengan
     SL sekarang tetap dikirim → broker menolak (retcode 10025 'No changes') tiap 30 detik."""
-    trail_m = float(v.exit[5:])
-    trail = trail_m / v.sl_atr * info["sl_dist"]
     since = h1[h1.index >= pd.Timestamp(info["entry_bar"])]
     if since.empty:
         return None
+    d = 1 if is_buy else -1
+    ext = since.high.max() if is_buy else since.low.min()
+    entry, dist = pos.price_open, info["sl_dist"]
+    cand = []
+    if spec.get("trail"):
+        atr_v = atr_now if spec.get("live") else dist / sl_atr
+        if atr_v is not None and atr_v == atr_v:
+            cand.append(ext - d * spec["trail"] * atr_v)
+    if spec.get("be") is not None and d * (ext - entry) >= spec["be"] * dist:
+        cand.append(entry)
+    if not cand:
+        return None
+    new = round(max(cand) if is_buy else min(cand), digits)
     half = 0.5 * 10 ** -digits
-    if is_buy:
-        new = round(since.high.max() - trail, digits)
-        return new if new > pos.sl + half else None
-    new = round(since.low.min() + trail, digits)
-    return new if new < pos.sl - half else None
+    return new if d * (new - pos.sl) > half else None
+
+
+def price_past(bk: Broker, pos, sl: float, is_buy: bool) -> bool:
+    """True bila harga sekarang sudah melewati level SL (SL tidak mungkin dipasang)."""
+    tk = bk.mt5.symbol_info_tick(pos.symbol)
+    return tk.bid <= sl if is_buy else tk.ask >= sl
 
 
 def sl_valid(bk: Broker, pos, sl: float, is_buy: bool) -> tuple[bool, str]:
@@ -208,10 +249,17 @@ def step(bk: Broker, st: dict, dry: bool = False) -> None:
                         bk.close(pos, f"{mid} max hold")
                     log(f"[{mid}] tutup #{pos.ticket}: hold > {MAX_HOLD_DAYS} hari")
                     continue
-                new = trail_sl(pos, h1, info, v, is_buy, bk.mt5.symbol_info(sym).digits)
+                spec = EXITS[mid]
+                atr_now = tf_atr_now(h1, v.tf, now_bar) if spec.get("live") else None
+                new = trail_sl(pos, h1, info, spec, v.sl_atr, is_buy, bk.mt5.symbol_info(sym).digits, atr_now)
                 if new is not None:
                     ok, why = sl_valid(bk, pos, new, is_buy)
-                    if not ok:                     # harga sudah lewat level trailing → tunggu, jangan spam error
+                    if not ok and price_past(bk, pos, new, is_buy):   # = backtest: stop kena di open bar ini
+                        if not dry:
+                            bk.close(pos, f"{mid} stop")
+                        log(f"[{mid}] tutup #{pos.ticket}: harga sudah melewati SL baru {new} ({why})")
+                        continue
+                    if not ok:                     # terlalu dekat harga (stops level) → tunggu, jangan spam error
                         if info.get("sl_skip") != new:
                             info["sl_skip"] = new
                             log(f"[{mid}] trailing #{pos.ticket} ditunda: {why}")
@@ -234,6 +282,9 @@ def step(bk: Broker, st: dict, dry: bool = False) -> None:
             if t_sig != now_bar or st["last_signal"].get(mid) == str(t_sig):
                 continue                                   # bukan sinyal di batas bar ini / sudah diproses
             st["last_signal"][mid] = str(t_sig)
+            if mid in ENTRY_OFF:
+                log(f"[{mid}] entry dimatikan (ENTRY_OFF): sinyal {t_sig:%Y-%m-%d %H:%M}Z dilewati")
+                continue
             if settings.is_paused(PAUSE_FILE):
                 log(f"[{mid}] PAUSE: sinyal {t_sig:%Y-%m-%d %H:%M}Z dilewati")
                 continue
@@ -267,7 +318,8 @@ def status(bk: Broker, st: dict) -> None:
         pos = bk.position(sym, magic)
         p = f"posisi #{pos.ticket} {'BUY' if pos.type == 0 else 'SELL'} {pos.volume} @ {pos.price_open} SL {pos.sl} P/L {pos.profit:+.2f}" if pos else "tanpa posisi"
         ls = f"sinyal terakhir {'BUY' if last.dir > 0 else 'SELL'} {sig.index[-1]:%Y-%m-%d %H:%M}Z" if last is not None else "-"
-        print(f"  {mid:13s} {sym:7s} {p} | {ls} | lot saat ini {lot} (risiko {risk:.1f}%)")
+        ex = " ".join(f"{k}={val}" for k, val in EXITS[mid].items()) + (" · ENTRY OFF" if mid in ENTRY_OFF else "")
+        print(f"  {mid:13s} {sym:7s} {p} | {ls} | lot saat ini {lot} (risiko {risk:.1f}%) | exit {ex}")
 
 
 def main() -> None:

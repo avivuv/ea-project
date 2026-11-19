@@ -12,13 +12,16 @@
 //| + garis EMA50 H1 (filter bias Pro & ORB XAU), dihitung langsung   |
 //|   dari bar H1: hijau = bias BUY (close > EMA & EMA naik > 0.1 ATR  |
 //|   / 3 bar), merah = bias SELL, abu-abu = netral; label bias kini.  |
+//| + Trend MA Cross (tg_signal/mac_live.py) di TF pilihan (H1/H4): SMA|
+//|   5/13/21/34 + EMA200, tanda sinyal (MA5 cross 3 MA + EMA200       |
+//|   searah vs 10 bar lalu) dan label status.                        |
 //| Canvas dipakai karena kotak bawaan MT5 tidak bisa transparan dan  |
 //| area yang bertumpuk jadi putih (XOR).                             |
 //| Hanya tampilan — tidak membuka order apa pun.                     |
 //+------------------------------------------------------------------+
 #property copyright   "ea-project"
-#property version     "2.40"
-#property description "Marker POI strategi sendiri (FVG/OB/IFVG M15, armed, CHoCH M5, entry/SL/TP) + area ORB New York + EMA50 H1 bias"
+#property version     "2.50"
+#property description "Marker POI strategi sendiri (FVG/OB/IFVG M15, armed, CHoCH M5, entry/SL/TP) + area ORB New York + EMA50 H1 bias + Trend MA Cross"
 #property indicator_chart_window
 #property indicator_plots 0
 
@@ -48,6 +51,14 @@ input int    InpEmaSpan    = 50;                // = EMA_SPAN pro_live / orb.h1_
 input double InpEmaSlope   = 0.1;               // = MIN_SLOPE (× ATR14 H1, kemiringan EMA dalam 3 bar)
 input int    InpEmaWidth   = 2;                 // tebal garis EMA (px)
 input color  InpEmaNeutral = C'150,150,150';    // EMA saat bias netral
+input bool   InpShowMac   = true;              // tampilkan Trend MA Cross (SMA 5/13/21/34 + EMA200) — hanya chart XAU
+input ENUM_TIMEFRAMES InpMacTf = PERIOD_H1;    // TF Trend MA Cross: H1 (XAU_H1_MAC) atau H4 (XAU_H4_MAC)
+input bool   InpMacSignal = true;              // tanda sinyal Trend MA Cross (MA5 cross 3 MA + EMA200 searah 10 bar)
+input color  InpMacMa5    = C'255,215,0';
+input color  InpMacMa13   = C'255,140,0';
+input color  InpMacMa21   = C'0,180,220';
+input color  InpMacMa34   = C'70,110,255';
+input color  InpMacEma    = C'190,120,255';    // EMA200
 
 #define NAME "PROPOI_canvas"
 #define EMA_BARS 1000                               // bar H1 yang dihitung (EMA adjust=False konvergen jauh sebelum ini)
@@ -56,6 +67,14 @@ datetime g_et[];                                     // waktu buka bar H1 (sudah
 double   g_ev[];                                     // nilai EMA
 int      g_eb[];                                     // bias bar itu: 1 BUY, -1 SELL, 0 netral
 double   g_eslope = 0;                               // kemiringan EMA bar terakhir (× ATR)
+
+#define MAC_BARS 1500
+datetime g_bt[];                                     // waktu buka bar TF Trend MA Cross (sudah close), lama → baru
+double   g_bh[], g_bl[];                             // high / low (posisi tanda sinyal)
+double   g_bm[5][MAC_BARS];                         // SMA5, SMA13, SMA21, SMA34, EMA200 (0 = belum ada)
+int      g_bs[];                                     // sinyal Trend MA Cross di bar itu: 1 BUY, -1 SELL, 0 tidak ada
+int      g_bup = 0;                                  // posisi MA5 bar terakhir: 1 di atas 3 MA, -1 di bawah, 0 campur
+int      g_bslope = 0;                               // EMA200 vs 10 bar lalu: 1 naik, -1 turun
 
 struct Row { string rec, dir, kind; datetime t1; double p1, p2, p3; int flag; };
 Row     g_rows[];
@@ -82,6 +101,132 @@ void ReadAll()
    if(InpShowOrb)
       ReadFile(OrbFile());
    CalcEma();
+   CalcMac();
+  }
+
+//--- Trend MA Cross, identik dengan mac_deep.indicators / live_signal (SMA close, EMA200 ewm adjust=False, slope 10 bar)
+void CalcMac()
+  {
+   ArrayResize(g_bt, 0);
+   if(!InpShowMac || !IsGold())
+      return;
+   MqlRates r[];
+   ArraySetAsSeries(r, false);
+   int n = CopyRates(_Symbol, InpMacTf, 1, MAC_BARS, r);   // hanya bar yang sudah close
+   if(n < 250)
+      return;
+   ArrayResize(g_bt, n);
+   ArrayResize(g_bh, n);
+   ArrayResize(g_bl, n);
+   ArrayResize(g_bs, n);
+   int per[4] = {5, 13, 21, 34};
+   double a = 2.0 / 201.0;
+   for(int i = 0; i < n; i++)
+     {
+      g_bt[i] = r[i].time;
+      g_bh[i] = r[i].high;
+      g_bl[i] = r[i].low;
+      for(int m = 0; m < 4; m++)
+        {
+         g_bm[m][i] = 0;
+         if(i >= per[m] - 1)
+           {
+            double s = 0;
+            for(int j = i - per[m] + 1; j <= i; j++)
+               s += r[j].close;
+            g_bm[m][i] = s / per[m];
+           }
+        }
+      g_bm[4][i] = i == 0 ? r[i].close : a * r[i].close + (1 - a) * g_bm[4][i - 1];
+     }
+   int prev = 0;
+   for(int i = 0; i < n; i++)
+     {
+      int up = MacUp(i);
+      g_bs[i] = 0;
+      if(i > 210 && up != 0 && up != prev && up * (g_bm[4][i] - g_bm[4][i - 10]) > 0)
+         g_bs[i] = up;
+      prev = up;
+     }
+   g_bup = MacUp(n - 1);
+   double d = g_bm[4][n - 1] - g_bm[4][n - 11];
+   g_bslope = d > 0 ? 1 : d < 0 ? -1 : 0;
+  }
+
+//--- 1 bila MA5 di atas SMA13/21/34, -1 bila di bawah ketiganya, 0 campur / data belum cukup
+int MacUp(int i)
+  {
+   if(g_bm[3][i] == 0)
+      return(0);
+   double a = g_bm[0][i];
+   if(a > g_bm[1][i] && a > g_bm[2][i] && a > g_bm[3][i])
+      return(1);
+   if(a < g_bm[1][i] && a < g_bm[2][i] && a < g_bm[3][i])
+      return(-1);
+   return(0);
+  }
+
+//--- garis antar dua titik, dipotong di tepi skala harga
+void LineSeg(int xa, int ya, int xb, int yb, color c, int width, uchar alpha)
+  {
+   int xr = g_w - 60;
+   if(xb < 0 || xa >= xr || xb == xa)
+      return;
+   if(xb > xr)
+     {
+      yb = ya + (int)MathRound((double)(yb - ya) * (xr - xa) / (double)(xb - xa));
+      xb = xr;
+     }
+   if(width > 1)
+      g_cv.LineThick(xa, ya, xb, yb, ColorToARGB(c, alpha), width, STYLE_SOLID, LINE_END_ROUND);
+   else
+      g_cv.LineAA(xa, ya, xb, yb, ColorToARGB(c, alpha));
+  }
+
+void DrawMac()
+  {
+   int n = ArraySize(g_bt);
+   if(n < 2)
+      return;
+   color cl[5];
+   cl[0] = InpMacMa5; cl[1] = InpMacMa13; cl[2] = InpMacMa21; cl[3] = InpMacMa34; cl[4] = InpMacEma;
+   for(int m = 0; m < 5; m++)
+     {
+      int px = 0, py = 0;
+      bool have = false;
+      for(int i = 0; i < n; i++)
+        {
+         int x, y;
+         if(g_bm[m][i] == 0 || !XY(g_bt[i], g_bm[m][i], x, y))
+           {
+            have = false;
+            continue;
+           }
+         if(have)
+            LineSeg(px, py, x, y, cl[m], m == 4 ? 2 : 1, 210);
+         px = x;
+         py = y;
+         have = true;
+        }
+     }
+   if(InpMacSignal)
+      for(int i = 0; i < n; i++)
+        {
+         if(g_bs[i] == 0)
+            continue;
+         bool buy = g_bs[i] == 1;
+         int x, y;
+         if(!XY(g_bt[i], buy ? g_bl[i] : g_bh[i], x, y) || x < 0 || x >= g_w - 60)
+            continue;
+         color c = buy ? InpBuyColor : InpSellColor;
+         g_cv.TextOut(x, buy ? y + 4 : y - 26, buy ? "▲" : "▼", ColorToARGB(c, 255), TA_CENTER);
+         g_cv.TextOut(x + 8, buy ? y + 6 : y - 24, buy ? "MA CROSS BUY" : "MA CROSS SELL", ColorToARGB(c, 230));
+        }
+   string tf = InpMacTf == PERIOD_H4 ? "H4" : InpMacTf == PERIOD_H1 ? "H1" : EnumToString(InpMacTf);
+   string pos = g_bup == 1 ? "MA5 di atas 3 MA" : g_bup == -1 ? "MA5 di bawah 3 MA" : "MA5 campur";
+   string sl = g_bslope == 1 ? "EMA200 naik" : g_bslope == -1 ? "EMA200 turun" : "EMA200 datar";
+   color c = (g_bup != 0 && g_bup == g_bslope) ? (g_bup == 1 ? InpBuyColor : InpSellColor) : InpEmaNeutral;
+   g_cv.TextOut(8, 40, "Trend MA Cross " + tf + " (SMA 5/13/21/34 · EMA200) · " + pos + " · " + sl, ColorToARGB(c, 255));
   }
 
 //--- EMA50 H1 + bias, identik dengan orb.h1_bias / pro_strategy.Market (ewm adjust=False, ATR = rata2 high-low 14)
@@ -360,6 +505,7 @@ void Render()
      }
    g_cv.Erase(0x00000000);
    g_cv.FontSet("Segoe UI", -80);
+   DrawMac();
    DrawEma();
    int n = ArraySize(g_rows);
    for(int i = 0; i < n; i++)

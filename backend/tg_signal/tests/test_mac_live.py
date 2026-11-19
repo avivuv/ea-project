@@ -1,9 +1,9 @@
-"""Runner BUMI harus mengambil keputusan yang sama dengan backtest bumi_deep (config terpilih)."""
+"""Runner Trend MA Cross harus mengambil keputusan yang sama dengan backtest mac_deep (config terpilih)."""
 import pandas as pd
 import pytest
 
-from tg_signal import bumi_deep as bd
-from tg_signal.bumi_live import SL_ATR, closed_tf
+from tg_signal import mac_deep as bd
+from tg_signal.mac_live import SL_ATR, closed_tf
 from tg_signal.dndfx_backtest import DATA, resample
 
 H1 = DATA / "h1_XAUUSD.csv.gz"
@@ -60,7 +60,7 @@ def test_closed_tf_drops_unfinished_h4():
 
 def replay_be(df: pd.DataFrame, be_r: float) -> list[tuple]:
     """Seperti replay() + breakeven: setelah close bar k, bila sempat +be_r R -> SL = entry (berlaku bar k+1)."""
-    from tg_signal.bumi_live import be_reached
+    from tg_signal.mac_live import be_reached
     ind = bd.indicators(df)
     h, l, c = df.high.to_numpy(), df.low.to_numpy(), df.close.to_numpy()
     out, pos = [], None                       # pos = [dir, sl, k entry, entry, dist]
@@ -87,7 +87,7 @@ def replay_be(df: pd.DataFrame, be_r: float) -> list[tuple]:
 
 @pytest.mark.skipif(not H1.exists(), reason="data H1 XAUUSD tidak ada")
 def test_replay_be_matches_exit_study():
-    from tg_signal.bumi_exit_study import events, simulate
+    from tg_signal.mac_exit_study import events, simulate
     df = resample(bd.load_pair("XAUUSD"), "4h")
     df = df[df.index >= "2020-01-01"]
     ind = bd.indicators(df)
@@ -101,7 +101,7 @@ def test_replay_be_matches_exit_study():
 
 
 def test_be_reached_sell_and_buy():
-    from tg_signal.bumi_live import be_reached
+    from tg_signal.mac_live import be_reached
     idx = pd.date_range("2026-11-17 12:00", periods=4, freq="h", tz="UTC")
     df = pd.DataFrame({"high": [100, 101, 99, 98], "low": [98, 95, 90, 94]}, index=idx)
     sig = str(idx[0])                                   # bar sinyal tidak dihitung

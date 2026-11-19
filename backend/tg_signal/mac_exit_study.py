@@ -1,5 +1,5 @@
 """
-Studi exit BUMI (entry sama dengan runner `bumi_live`: cross langsung MA5 vs 13/21/34, filter slope EMA200,
+Studi exit Trend MA Cross (entry sama dengan runner `mac_live`: cross langsung MA5 vs 13/21/34, filter slope EMA200,
 SL 3 x ATR14, entry di close bar sinyal + spread). Yang divariasikan hanya cara keluar:
 
   base          exit saat bar close dengan MA5 di sisi berlawanan ketiga MA (aturan runner sekarang)
@@ -15,14 +15,14 @@ SL 3 x ATR14, entry di close bar sinyal + spread). Yang divariasikan hanya cara 
 Intrabar konservatif: di tiap bar SL (stop yang berlaku dari bar sebelumnya) dicek lebih dulu, lalu TP,
 lalu trailing di-update pakai high bar itu (berlaku mulai bar berikutnya).
 
-    python -m tg_signal.bumi_exit_study
+    python -m tg_signal.mac_exit_study
 """
 from __future__ import annotations
 
 import numpy as np
 import pandas as pd
 
-from tg_signal.bumi_deep import indicators, load_pair
+from tg_signal.mac_deep import indicators, load_pair
 from tg_signal.dndfx_backtest import resample
 
 SPLIT = pd.Timestamp("2021-01-01", tz="UTC")
@@ -134,7 +134,7 @@ def main() -> None:
         res["dPF_test"] = (res.PF_test - base.PF_test).round(2)
         print(f"\n== XAUUSD {tf}: {df.index[0]:%Y-%m-%d} s/d {df.index[-1]:%Y-%m-%d} (train < {SPLIT:%Y}, test >=)")
         print(res.sort_values("PF_test", ascending=False).to_string())
-        res.to_csv(f"{__file__.rsplit('tg_signal', 1)[0]}tg_signal/data/bumi_exit_{tf}.csv")
+        res.to_csv(f"{__file__.rsplit('tg_signal', 1)[0]}tg_signal/data/mac_exit_{tf}.csv")
 
 
 if __name__ == "__main__":

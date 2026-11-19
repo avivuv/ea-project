@@ -1,6 +1,6 @@
 """
 Dashboard monitoring (NiceGUI) — HANYA MEMBACA database, log, dan akun MT5.
-Kontrol: Pause per metode (data/PAUSE_TG, PAUSE_SWING, PAUSE_BUMI, PAUSE_PRO, PAUSE_ORB) dan
+Kontrol: Pause per metode (data/PAUSE_TG, PAUSE_SWING, PAUSE_MAC, PAUSE_PRO, PAUSE_ORB) dan
 Pause semua (data/PAUSE). Pause = tanpa entry baru; posisi terbuka tetap dikelola runner.
 
 Tab:
@@ -76,7 +76,7 @@ class Group:
     tab: str
     icon: str
     title: str
-    rule: str
+    rule: list[str]                    # satu kalimat per baris (EYD, diakhiri titik)
     methods: list[Method]
     pause: Path                        # file pause metode (Pause global juga berlaku)
     pause_note: str = ""               # apa yang tetap jalan saat pause
@@ -86,18 +86,20 @@ class Group:
     logs: list[str] = field(default_factory=list)
 
 
-def bumi_extra(m: Method) -> str:
+def mac_extra(m: Method) -> str:
     try:
-        i = json.loads((D / "bumi_state.json").read_text(encoding="utf-8")).get("info", {}).get(m.id)
+        i = json.loads((D / "mac_state.json").read_text(encoding="utf-8")).get("info", {}).get(m.id)
     except Exception:
         i = None
     if not i:
-        return "belum ada data dari runner"
+        return "Belum ada data dari runner."
     bar = (pd.Timestamp(i["bar"]) + WIB).strftime("%d/%m %H:%M")
     m5, m13, m21, m34 = i["ma"]
-    return (f"bar {bar} WIB · close {i['close']:g} · {i['state']} · EMA200 {i['slope']} · "
-            f"MA 5/13/21/34: {m5:g} / {m13:g} / {m21:g} / {m34:g} · SL bila sinyal {i['sl_dist']:g}"
-            + (f" · sinyal terakhir {i['last_signal']}" if i.get("last_signal") else ""))
+    return (f"Bar {bar} WIB, close {i['close']:g}, status {i['state']}, EMA200 {i['slope']}. "
+            f"MA 5/13/21/34: {m5:g} / {m13:g} / {m21:g} / {m34:g}. "
+            f"Jika sinyal muncul sekarang, SL berjarak ${i['sl_dist']:.2f} dari entry "
+            f"({i['sl_dist'] / 0.1:.0f} pips = 3 × ATR14)."
+            + (f" Sinyal terakhir: {i['last_signal']}." if i.get("last_signal") else ""))
 
 
 def orb_extra(m: Method) -> str:
@@ -117,19 +119,20 @@ def orb_extra(m: Method) -> str:
             st = {}
     today = st.get("day") == str(ny_now.date())
     rng = st.get("or") if today else None
-    rng_txt = f" · range {rng[1]:.2f}–{rng[0]:.2f} (lebar {rng[0] - rng[1]:.2f})" if rng else ""
+    rng_txt = f" Range {rng[1]:.2f}–{rng[0]:.2f} (lebar {rng[0] - rng[1]:.2f})." if rng else ""
     if ny_now.weekday() >= 5:
-        return "libur — pasar NY tutup (Sabtu/Minggu)"
+        return "Libur: pasar NY tutup pada hari Sabtu dan Minggu."
     if now < op:
-        return f"menunggu NY buka · range dibentuk {hm(op)}–{hm(or_end)} WIB"
+        return f"Menunggu NY buka. Range dibentuk pukul {hm(op)}–{hm(or_end)} WIB."
     if now < or_end:
-        return f"membentuk range sampai {hm(or_end)} WIB"
+        return f"Sedang membentuk range sampai pukul {hm(or_end)} WIB."
     if today and st.get("pos"):
         close_at = (st.get("pos") or {}).get("close_at")
-        return "posisi terbuka" + rng_txt + (f" · tutup paksa {hm(close_at)} WIB" if close_at else "")
+        return ("Posisi terbuka." + rng_txt
+                + (f" Ditutup paksa pukul {hm(close_at)} WIB." if close_at else ""))
     if today and not st.get("done") and now < brk_end:
-        return f"tunggu breakout s/d {hm(brk_end)} WIB" + rng_txt
-    return "selesai hari ini" + rng_txt
+        return f"Menunggu breakout sampai pukul {hm(brk_end)} WIB." + rng_txt
+    return "Selesai untuk hari ini." + rng_txt
 
 
 def tg_extra(m: Method) -> str:
@@ -140,59 +143,74 @@ def tg_extra(m: Method) -> str:
     except Exception:
         return ""
     hit = settings.TG_DAILY_PROFIT_USD > 0 and r["pnl"] >= settings.TG_DAILY_PROFIT_USD
-    return (f"hari ini {r['n']} trade {r['pnl']:+.2f} USD · maks {settings.TG_MAX_TRADES_DAY}/hari · "
-            f"batas rugi ${settings.TG_DAILY_LOSS_USD:g}"
-            + (f" · target ${settings.TG_DAILY_PROFIT_USD:g}" if settings.TG_DAILY_PROFIT_USD > 0 else "")
-            + (" · ✋ target tercapai, stop" if hit else ""))
+    return (f"Hari ini: {r['n']} trade, {r['pnl']:+.2f} USD. "
+            f"Batas harian: maksimal {settings.TG_MAX_TRADES_DAY} trade, rugi maksimal ${settings.TG_DAILY_LOSS_USD:g}"
+            + (f", target profit ${settings.TG_DAILY_PROFIT_USD:g}" if settings.TG_DAILY_PROFIT_USD > 0 else "")
+            + "." + (" ✋ Target tercapai, entry baru dihentikan." if hit else ""))
+
+
+def _tg_rule() -> list[str]:
+    entry = {"POI": f"Entry menunggu POI {settings.TG_POI_TF} (FVG/OB) terbentuk di zona sinyal.",
+             "ZONE": "Entry di zona sinyal: market jika harga sudah di zona, limit jika belum."}.get(
+        settings.TG_ENTRY_MODE, f"Mode entry {settings.TG_ENTRY_MODE}.")
+    rule = [entry, f"TP {settings.TG_TP_PIPS:g} pips, SL {settings.TG_SL_PIPS:g} pips, lot {settings.TG_LOT}.",
+            f"Maksimal {settings.TG_MAX_POSITIONS} posisi terbuka bersamaan." if settings.TG_MAX_POSITIONS
+            else "Jumlah posisi terbuka tidak dibatasi."]
+    if settings.TG_ADMIN_TP_PIPS > 0:
+        rule.append(f"Jika admin mengumumkan TP di chat, TP digeser ke {settings.TG_ADMIN_TP_PIPS:g} pips "
+                    "(langsung ditutup bila harga sudah melewatinya).")
+    return rule
 
 
 GROUPS = [
-    Group("tg", "EA sinyal Telegram", "send", "Scalping sinyal Telegram — XAUUSD",
-          f"Entry {settings.TG_ENTRY_MODE}"
-          + (f" (POI {settings.TG_POI_TF})" if settings.TG_ENTRY_MODE == "POI" else "")
-          + f" · TP {settings.TG_TP_PIPS:g} / SL {settings.TG_SL_PIPS:g} pips · lot {settings.TG_LOT} · "
-          f"maks {settings.TG_MAX_POSITIONS or '∞'} posisi · admin TP dari chat",
-          [Method("TG_SIGNAL", settings.SYMBOL, settings.TG_MAGIC, "sinyal topik Scalping", "live.log",
+    Group("tg", "EA sinyal Telegram", "send", "Scalping sinyal Telegram — XAUUSD", _tg_rule(),
+          [Method("TG_SIGNAL", settings.SYMBOL, settings.TG_MAGIC, "Sinyal dari topik Scalping", "live.log",
                   "heartbeat", 60)],
-          pause=settings.PAUSE_TG, pause_note="posisi & pending yang sudah ada tetap dikelola",
-          idle="menunggu sinyal", extra=tg_extra),
-    Group("swing", "Swing Donchian", "trending_up", "Swing trend-following — XAUUSD · BTCUSD · USDJPY",
-          "Donchian breakout + filter tren D1 · tanpa TP, trailing ATR · risiko 0,5%/trade "
-          "(skip bila lot minimum > 2% saldo) · 1 posisi per metode",
+          pause=settings.PAUSE_TG, pause_note="posisi dan pending yang sudah ada tetap dikelola",
+          idle="Menunggu sinyal.", extra=tg_extra),
+    Group("swing", "Swing Donchian", "trending_up", "Swing trend-following — XAUUSD, BTCUSD, USDJPY",
+          ["Entry saat harga breakout channel Donchian, searah tren D1.",
+           "Tanpa TP; posisi dijaga trailing stop berbasis ATR (lebar per metode, XAU H4 + breakeven 1R).",
+           "Risiko 0,5% saldo per trade; trade dilewati jika lot minimum berisiko lebih dari 2% saldo.",
+           "Maksimal 1 posisi per metode."],
           [Method(i, s, mg, desc, "swing_live.log", "swing_heartbeat") for i, s, desc, mg in (
-              ("XAU_D1_DON20", "XAUUSD", "Donchian D1 20 · trail 3 ATR", 26111201),
-              ("XAU_H4_DON55", "XAUUSD", "Donchian H4 55 · trail 4 ATR", 26111202),
-              ("BTC_H4_DON55", "BTCUSD", "Donchian H4 55 · trail 4 ATR", 26111203),
-              ("JPY_H4_DON55", "USDJPY", "Donchian H4 55 · trail 4 ATR", 26111204))],
-          pause=settings.PAUSE_SWING, pause_note="trailing tetap jalan", idle="menunggu breakout"),
-    Group("bumi", "BUMI 4 MA", "show_chart", "BUMI 4 MA — XAUUSD H4 & H1",
-          "SMA 5/13/21/34 · entry saat MA5 pindah ke atas/bawah ketiga MA + EMA200 searah (10 bar) · "
-          "SL 3 ATR14 · breakeven setelah +0,5R · tanpa TP, exit saat MA5 cross balik · risiko 0,5%/trade · "
-          "1 posisi per metode",
-          [Method(i, "XAUUSD", mg, desc, "bumi_live.log", "bumi_heartbeat") for i, desc, mg in (
-              ("XAU_H4_BUMI", "BUMI H4 · cross langsung · SL 3 ATR", 26111701),
-              ("XAU_H1_BUMI", "BUMI H1 · cross langsung · SL 3 ATR", 26111702))],
-          pause=settings.PAUSE_BUMI, pause_note="exit cross MA tetap jalan", idle="menunggu MA5 cross",
-          extra=bumi_extra),
+              ("XAU_D1_DON20", "XAUUSD", "Donchian D1 20 bar, trailing 3 ATR (ATR terbaru)", 26111201),
+              ("XAU_H4_DON55", "XAUUSD", "Donchian H4 55 bar, BE 1R + trailing 5 ATR", 26111202),
+              ("BTC_H4_DON55", "BTCUSD", "Donchian H4 55 bar, trailing 6 ATR (ATR terbaru)", 26111203),
+              ("JPY_H4_DON55", "USDJPY", "Donchian H4 55 bar, trailing 4 ATR — entry baru dimatikan", 26111204))],
+          pause=settings.PAUSE_SWING, pause_note="trailing stop tetap berjalan", idle="Menunggu breakout."),
+    Group("mac", "Trend MA Cross", "show_chart", "Trend MA Cross — XAUUSD H4 dan H1",
+          ["Entry BUY saat SMA 5 naik melewati SMA 13, 21, dan 34 (SELL sebaliknya), "
+           "dengan EMA 200 searah selama 10 bar.",
+           "SL 3 ATR14, digeser ke breakeven setelah profit +0,5R.",
+           "Tanpa TP; posisi ditutup saat SMA 5 cross balik.",
+           "Risiko 0,5% saldo per trade, maksimal 1 posisi per metode."],
+          [Method(i, "XAUUSD", mg, desc, "mac_live.log", "mac_heartbeat") for i, desc, mg in (
+              ("XAU_H4_MAC", "MA Cross H4, entry langsung saat cross, SL 3 ATR", 26111701),
+              ("XAU_H1_MAC", "MA Cross H1, entry langsung saat cross, SL 3 ATR", 26111702))],
+          pause=settings.PAUSE_MAC, pause_note="exit saat cross MA tetap berjalan",
+          idle="Menunggu SMA 5 cross.", extra=mac_extra),
     Group("pro", "SMC Top-Down", "insights", "SMC Top-Down — XAUUSD",
-          f"Bias EMA50 H1 (kemiringan > 0,1 ATR) · POI M15 FVG/OB/IFVG · konfirmasi CHoCH M5 · entry FVG M5 · "
-          f"RR 1:3 · SL maks 100 pips · lot {settings.PRO_LOT} · tanpa entry ±{settings.PRO_NEWS_MIN:g} mnt "
-          "news USD",
-          [Method("XAU_SMC_TD", settings.SYMBOL, settings.PRO_MAGIC, "bias H1 → POI M15 → CHoCH M5",
+          ["Bias dari EMA50 H1 dengan kemiringan lebih dari 0,1 ATR.",
+           "Harga harus masuk POI M15 (FVG/OB/IFVG), lalu dikonfirmasi CHoCH M5; entry di FVG M5.",
+           f"RR 1:3, SL maksimal 100 pips, lot {settings.PRO_LOT}.",
+           f"Tidak entry {settings.PRO_NEWS_MIN:g} menit sebelum dan sesudah news USD."],
+          [Method("XAU_SMC_TD", settings.SYMBOL, settings.PRO_MAGIC, "Bias H1 → POI M15 → CHoCH M5",
                   "pro_live.log", "pro_heartbeat")],
-          pause=settings.PAUSE_PRO, pause_note="posisi & pending yang sudah ada tetap jalan",
-          idle="menunggu setup"),
+          pause=settings.PAUSE_PRO, pause_note="posisi dan pending yang sudah ada tetap berjalan",
+          idle="Menunggu setup."),
     Group("orb", "ORB NY", "schedule", "ORB New York — Opening Range Breakout",
-          "Range setelah NY buka 09:30 New York (DST otomatis) · breakout = close M5 di luar range ≤ 2 jam · "
-          "entry market · SL sisi seberang range · TP 2R · tutup paksa 6 jam setelah buka · "
-          "maks 1 trade/hari per instrumen",
+          ["Range dibentuk sejak pasar NY buka pukul 09.30 waktu New York (DST otomatis).",
+           "Breakout valid jika candle M5 close di luar range, paling lambat 2 jam setelah range terbentuk.",
+           "Entry market; SL di sisi seberang range, TP 2R.",
+           "Posisi ditutup paksa 6 jam setelah NY buka; maksimal 1 trade per hari per instrumen."],
           [Method(f"ORB_{s.symbol}", s.symbol, s.magic,
-                  f"range {s.cfg.or_min} mnt · "
+                  f"Range {s.cfg.or_min} menit, "
                   + ("searah bias EMA50 H1" if s.cfg.bias == "with" else "tanpa filter bias")
-                  + f" · TP {s.cfg.tp}R · {s.lot_text}", s.log_path.name, s.heartbeat.name)
+                  + f", TP {s.cfg.tp}R, {s.lot_text}", s.log_path.name, s.heartbeat.name)
            for s in ORB_SPECS.values()],
-          pause=settings.PAUSE_ORB, pause_note="posisi terbuka & tutup paksa tetap jalan",
-          idle="maks 1 trade per hari", extra=orb_extra),
+          pause=settings.PAUSE_ORB, pause_note="posisi terbuka dan tutup paksa tetap berjalan",
+          idle="Menunggu sesi NY.", extra=orb_extra),
 ]
 ALL_METHODS = [m for g in GROUPS for m in g.methods]
 GROUP_OF = {m.magic: g for g in GROUPS for m in g.methods}
@@ -285,7 +303,7 @@ LOG_RE = re.compile(r"^(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d)(?:,\d+)?(Z)?\s+(?:INFO\s
 
 def read_logs(names: list[str], n: int = 40) -> str:
     """Gabung beberapa log (terbaru di atas), jam diseragamkan ke WIB 'dd/mm HH:MM:SS'.
-    Log berakhiran Z (swing/BUMI) = UTC; log logging Python = jam lokal PC (WIB)."""
+    Log berakhiran Z (swing/MA Cross) = UTC; log logging Python = jam lokal PC (WIB)."""
     rows = []
     for name in names:
         p = D / name
@@ -362,16 +380,16 @@ def pause_controls(g: Group, refresh_all: Callable[[], None]):
     def toggle() -> None:
         if g.pause.exists():
             g.pause.unlink()
-            ui.notify(f"{g.tab}: entry baru diizinkan lagi")
+            ui.notify(f"{g.tab}: entry baru diizinkan lagi.")
         else:
             g.pause.write_text("pause dari dashboard")
-            ui.notify(f"{g.tab} pause: tanpa entry baru ({g.pause_note})")
+            ui.notify(f"{g.tab} di-pause: tidak ada entry baru ({g.pause_note}).")
         refresh_all()
 
     def confirm() -> None:
         with ui.dialog() as dlg, ui.card():
             ui.label(f"Lanjutkan entry {g.tab}?" if g.pause.exists()
-                     else f"Hentikan entry {g.tab} baru? Posisi terbuka tetap berjalan ({g.pause_note}).")
+                     else f"Hentikan entry baru {g.tab}? Posisi terbuka tetap berjalan ({g.pause_note}).")
             with ui.row():
                 ui.button("Ya", on_click=lambda: (dlg.close(), toggle()))
                 ui.button("Batal", on_click=dlg.close).props("flat")
@@ -385,7 +403,8 @@ def method_tab(g: Group, refresh_all: Callable[[], None]) -> Callable[[dict], No
     with ui.row().classes("w-full items-start justify-between no-wrap max-md:flex-wrap"):
         with ui.column().classes("gap-0 flex-1"):
             ui.label(g.title).classes("text-xl font-semibold")
-            ui.label(g.rule).classes("sub")
+            for line in g.rule:
+                ui.label(f"• {line}").classes("sub")
         with ui.row().classes("items-center gap-3 no-wrap"):
             prog = ui.label("").classes("font-semibold")
             btn = pause_controls(g, refresh_all)
@@ -403,7 +422,7 @@ def method_tab(g: Group, refresh_all: Callable[[], None]) -> Callable[[dict], No
                 with ui.row().classes("w-full items-center justify-between no-wrap"):
                     ui.label(f"{m.symbol} · {m.id}").classes("label")
                     st = ui.label("").classes("sub")
-                ui.label(f"{m.desc} · magic {m.magic}").classes("sub")
+                ui.label(m.desc).classes("sub").tooltip(f"magic {m.magic}")
                 v = ui.label("-").classes("value num")
                 body = ui.column().classes("gap-0")
                 ex = ui.label("").classes("sub num") if g.extra else None
@@ -460,7 +479,7 @@ def method_tab(g: Group, refresh_all: Callable[[], None]) -> Callable[[dict], No
         set_val(v_wr, f"{100 * len(win) / len(closed):.0f}%" if closed else "-")
         avg_w = sum(c["usd"] for c in win) / len(win) if win else 0
         avg_l = sum(c["usd"] for c in loss) / len(loss) if loss else 0
-        s_wr.text = (f"untung {len(win)} · rugi {len(loss)} · rata² {avg_w:+.2f} / {avg_l:+.2f}" if closed else "")
+        s_wr.text = (f"untung {len(win)} · rugi {len(loss)} · rata-rata {avg_w:+.2f} / {avg_l:+.2f}" if closed else "")
 
         for m in g.methods:
             st, v, body, ex = cards[m.magic]
@@ -529,10 +548,12 @@ def journal_card(g: Group) -> None:
     tg = g.key == "tg"
     with ui.element("div").classes("card w-full"):
         ui.label("Jurnal trading (.xlsx)").classes("label")
-        ui.label("Tiap sinyal: keputusan ENTRY/SKIP + alasan, POI di zona, alur status, entry/SL/TP/exit, "
-                 "pips, USD, R, dan perkiraan hasil versi admin. Sheet ringkasan harian & alasan skip." if tg else
-                 "Trade (entry/SL/TP/exit, hasil, USD, R, durasi, alasan entry), setup → entry / tidak entry + "
-                 "alasan, kejadian log runner, ringkasan harian & per sub-metode.").classes("sub")
+        ui.label("Berisi setiap sinyal beserta keputusan ENTRY/SKIP dan alasannya, POI di zona, alur status, "
+                 "entry/SL/TP/exit, pips, USD, R, serta perkiraan hasil versi admin. Dilengkapi sheet ringkasan "
+                 "harian dan alasan skip." if tg else
+                 "Berisi setiap trade (entry/SL/TP/exit, hasil, USD, R, durasi, alasan entry), setiap setup "
+                 "beserta keputusan entry atau tidak dan alasannya, kejadian di log runner, serta ringkasan "
+                 "harian dan per sub-metode.").classes("sub")
         with ui.row().classes("items-center gap-3 mt-2"):
             d_from = date_input("Dari (WIB)", today.replace(day=1).isoformat())
             d_to = date_input("Sampai (WIB)", today.isoformat())
@@ -728,18 +749,19 @@ def build(start_tab: str = "") -> None:
     def toggle_pause() -> None:
         if settings.PAUSE_FILE.exists():
             settings.PAUSE_FILE.unlink()
-            ui.notify("Resume global: metode yang tidak di-pause sendiri boleh entry lagi")
+            ui.notify("Pause global dicabut: metode yang tidak di-pause sendiri boleh entry lagi.")
         else:
             settings.PAUSE_FILE.parent.mkdir(parents=True, exist_ok=True)
             settings.PAUSE_FILE.write_text("pause dari dashboard")
-            ui.notify("Pause semua metode: tidak ada entry baru (posisi terbuka tetap dikelola)")
+            ui.notify("Semua metode di-pause: tidak ada entry baru, posisi terbuka tetap dikelola.")
         refresh()
 
     def confirm_pause() -> None:
         paused = settings.PAUSE_FILE.exists()
         with ui.dialog() as dlg, ui.card():
             ui.label("Cabut pause global? Metode yang di-pause sendiri tetap pause." if paused
-                     else "Pause SEMUA metode? Tidak ada entry baru; posisi terbuka, SL/TP & trailing tetap berjalan.")
+                     else "Pause SEMUA metode? Tidak akan ada entry baru; posisi terbuka, SL/TP, dan trailing "
+                          "tetap berjalan.")
             with ui.row():
                 ui.button("Ya", on_click=lambda: (dlg.close(), toggle_pause()))
                 ui.button("Batal", on_click=dlg.close).props("flat")
@@ -778,7 +800,7 @@ PASSWORD = os.getenv("TG_DASH_PASSWORD", "")
 
 @ui.page("/")
 def index(tab: str = "") -> None:
-    """`/?tab=tg|swing|bumi|pro|orb` membuka langsung tab metode itu."""
+    """`/?tab=tg|swing|mac|pro|orb` membuka langsung tab metode itu."""
     if PASSWORD and not app.storage.user.get("ok"):
         ui.navigate.to("/login")
         return

@@ -1,4 +1,4 @@
-"""Pendalaman BUMI (SMA 5/13/21/34) di H4: variasi SL, filter trend, pair lain, train/test.
+"""Pendalaman Trend MA Cross (asal: BUMI DNDFX; SMA 5/13/21/34) di H4: variasi SL, filter trend, pair lain, train/test.
 
 Entry (dokumen DNDFX): cross = MA5 melewati 13/21/34; urut = tunggu 5>13>21>34;
 langsung = close candle trigger; engulf = koreksi lalu engulfing ketat (close > high candle sebelumnya).
@@ -8,8 +8,8 @@ SL : pct0.3 (0.3% harga) | atr1.5/atr2/atr3 (ATR14 TF) | swing (low/high 10 bar 
 Filter: none | ema200 (close di sisi EMA200) | slope (EMA200 naik/turun 10 bar)
 Train 2014-2020, test 2021-2026.
 
-    python -m tg_signal.bumi_deep            # semua pair, H4
-    python -m tg_signal.bumi_deep --tf 1D
+    python -m tg_signal.mac_deep            # semua pair, H4
+    python -m tg_signal.mac_deep --tf 1D
 """
 from __future__ import annotations
 
@@ -33,7 +33,7 @@ def load_pair(sym: str) -> pd.DataFrame:
 
 def indicators(df: pd.DataFrame) -> dict:
     """SMA 5/13/21/34, EMA200, ATR14 + status 'up' (MA5 di sisi d ketiga MA) & 'order' (4 MA berurutan).
-    Dipakai backtest (run) dan runner live (bumi_live) supaya aturannya identik."""
+    Dipakai backtest (run) dan runner live (mac_live) supaya aturannya identik."""
     h, l, c = (df[k].to_numpy(float) for k in ("high", "low", "close"))
     s = pd.Series(c)
     a, b, e, f = (s.rolling(p).mean().to_numpy() for p in (5, 13, 21, 34))
@@ -148,7 +148,7 @@ def main() -> None:
         print(ok.head(10).to_string(index=False))
         print(f"   median PF_train {res.PF_train.median():.2f} | median PF_test {res.PF_test.median():.2f}"
               f" | varian PF_test>1: {(res.PF_test > 1).mean() * 100:.0f}%")
-    pd.DataFrame(rows).to_csv(DATA / f"bumi_deep_{a.tf}.csv", index=False)
+    pd.DataFrame(rows).to_csv(DATA / f"mac_deep_{a.tf}.csv", index=False)
 
 
 if __name__ == "__main__":

@@ -105,7 +105,7 @@ PAUSE_TG = DATA_DIR / "PAUSE_TG"                        # EA sinyal Telegram (ru
 PAUSE_PRO = DATA_DIR / "PAUSE_PRO"                      # SMC Top-Down (pro_live)
 PAUSE_ORB = DATA_DIR / "PAUSE_ORB"                      # ORB NY, semua instrumen (orb_live)
 PAUSE_SWING = DATA_DIR / "PAUSE_SWING"                  # swing Donchian (intraday.swing_live)
-PAUSE_BUMI = DATA_DIR / "PAUSE_BUMI"                    # BUMI 4 MA (bumi_live)
+PAUSE_MAC = DATA_DIR / "PAUSE_MAC"                    # Trend MA Cross (mac_live)
 
 
 def is_paused(method_file: Path) -> bool:

@@ -1,23 +1,23 @@
 """
-Runner BUMI (4 MA: SMA 5/13/21/34) — eksekusi via MetaTrader5, HANYA akun DEMO.
-Aturan = config terpilih di `tg_signal.bumi_deep` (fungsi `indicators` & `live_signal` yang sama):
+Runner Trend MA Cross (asal: BUMI DNDFX, 4 MA: SMA 5/13/21/34) — eksekusi via MetaTrader5, HANYA akun DEMO.
+Aturan = config terpilih di `tg_signal.mac_deep` (fungsi `indicators` & `live_signal` yang sama):
 
 - Sinyal di bar TF (H4 / H1, di-resample dari H1) yang SUDAH close: MA5 baru saja pindah ke atas
   (buy) / bawah (sell) ketiga MA lain, dan EMA200 TF naik (buy) / turun (sell) dibanding 10 bar lalu.
 - Entry market di awal bar berikutnya. SL = 3 x ATR14 TF. Tanpa TP.
 - Exit: bar TF close dengan MA5 sudah di sisi berlawanan ketiga MA -> tutup market. Atau kena SL.
-- Breakeven (18 Nov 2026, studi `bumi_exit_study`): setelah bar TF close di mana harga sempat mencapai
+- Breakeven (18 Nov 2026, studi `mac_exit_study`): setelah bar TF close di mana harga sempat mencapai
   +BE_R x jarak SL dari entry, SL dipindah ke harga entry. Bila harga sudah kembali melewati entry
   (SL tidak bisa dipasang), posisi ditutup market — sama dengan backtest (stop kena di open bar berikutnya).
 - Bar yang sama dengan exit (SL / cross balik) tidak membuka posisi baru (sama dengan backtest).
 - 1 posisi per metode (magic number). Lot = RISK_PCT saldo; skip bila lot minimum berisiko > MAX_RISK_PCT.
   Tidak ada batas risiko gabungan dengan runner lain (keputusan user 17 Nov 2026: akun demo, kumpulkan data).
 
-    python -m tg_signal.bumi_live              # jalan terus (cek tiap 30 detik, aksi saat bar H1 baru)
-    python -m tg_signal.bumi_live --once       # status + satu kali cek tanpa order
-    python -m tg_signal.bumi_live --status
+    python -m tg_signal.mac_live              # jalan terus (cek tiap 30 detik, aksi saat bar H1 baru)
+    python -m tg_signal.mac_live --once       # status + satu kali cek tanpa order
+    python -m tg_signal.mac_live --status
 
-State: data/bumi_state.json · Log: data/bumi_live.log · Pause entry baru: file data/PAUSE_BUMI atau data/PAUSE (global)
+State: data/mac_state.json · Log: data/mac_live.log · Pause entry baru: file data/PAUSE_MAC atau data/PAUSE (global)
 """
 from __future__ import annotations
 
@@ -31,7 +31,7 @@ import pandas as pd
 
 from intraday.swing_live import Broker as _SwingBroker, sl_valid
 from tg_signal import settings
-from tg_signal.bumi_deep import indicators, live_signal
+from tg_signal.mac_deep import indicators, live_signal
 from tg_signal.dndfx_backtest import resample
 
 RISK_PCT = 0.5
@@ -40,14 +40,14 @@ SL_ATR = 3.0
 BE_R = 0.5              # SL -> entry setelah harga sempat +0.5R (None = matikan)
 POLL_SEC = 30
 METHODS = [  # (id, simbol, TF, magic)
-    ("XAU_H4_BUMI", "XAUUSD", "4h", 26111701),
-    ("XAU_H1_BUMI", "XAUUSD", "1h", 26111702),
+    ("XAU_H4_MAC", "XAUUSD", "4h", 26111701),
+    ("XAU_H1_MAC", "XAUUSD", "1h", 26111702),
 ]
 TF_HOURS = {"1h": 1, "4h": 4}
-STATE_PATH = settings.DATA_DIR / "bumi_state.json"
-LOG_PATH = settings.DATA_DIR / "bumi_live.log"
-HEARTBEAT = settings.DATA_DIR / "bumi_heartbeat"
-PAUSE_FILE = settings.PAUSE_BUMI    # ada (atau PAUSE global) -> tidak ada entry baru (exit tetap jalan)
+STATE_PATH = settings.DATA_DIR / "mac_state.json"
+LOG_PATH = settings.DATA_DIR / "mac_live.log"
+HEARTBEAT = settings.DATA_DIR / "mac_heartbeat"
+PAUSE_FILE = settings.PAUSE_MAC    # ada (atau PAUSE global) -> tidak ada entry baru (exit tetap jalan)
 
 
 def log(msg: str) -> None:
@@ -71,7 +71,7 @@ def save_state(st: dict) -> None:
 
 
 class Broker(_SwingBroker):
-    """Broker swing_live (cek akun DEMO, order, close) + lot sesuai konstanta BUMI."""
+    """Broker swing_live (cek akun DEMO, order, close) + lot sesuai konstanta Trend MA Cross."""
 
     def lot_for(self, symbol: str, sl_dist: float) -> tuple[float, float]:
         i, bal = self.mt5.symbol_info(symbol), self.mt5.account_info().balance
@@ -142,7 +142,7 @@ def step(bk: Broker, st: dict, dry: bool = False) -> None:
                     log(f"[{mid}] adopsi posisi #{pos.ticket} tanpa state")
                 if ind["up"][-d][k]:
                     if not dry:
-                        bk.close(pos, f"bumi {mid} crossMA")
+                        bk.close(pos, f"mac {mid} crossMA")
                         st["positions"].pop(mid, None)
                     log(f"[{mid}] EXIT cross MA #{pos.ticket} {'BUY' if d > 0 else 'SELL'} P/L {pos.profit:+.2f} "
                         f"(bar {df.index[k]:%Y-%m-%d %H:%M}Z close {df.close.iloc[k]:.3f})")
@@ -157,7 +157,7 @@ def step(bk: Broker, st: dict, dry: bool = False) -> None:
                         info["be"] = True
                         log(tag)
                     else:
-                        bk.close(pos, f"bumi {mid} BE")
+                        bk.close(pos, f"mac {mid} BE")
                         st["positions"].pop(mid, None)
                         log(f"{tag} tidak bisa ({why}) -> tutup market P/L {pos.profit:+.2f}")
                         exited = True
@@ -182,7 +182,7 @@ def step(bk: Broker, st: dict, dry: bool = False) -> None:
                         elif dry:
                             log(f"[{mid}] (dry) akan {side} {lot} lot, SL jarak {sl_dist:.3f}, risiko {risk:.2f}%")
                         else:
-                            res = bk.open(sym, d, lot, sl_dist, magic, f"bumi {mid}")
+                            res = bk.open(sym, d, lot, sl_dist, magic, f"mac {mid}")
                             st["positions"][mid] = {"ticket": res.order, "dir": d, "entry_bar": tbar,
                                                     "sl_dist": sl_dist, "lot": lot, "risk_pct": round(risk, 2)}
                             log(f"[{mid}] OPEN {side} {lot} lot @ {res.price} SL jarak {sl_dist:.3f} "
@@ -218,7 +218,7 @@ def main() -> None:
         if a.once:
             step(bk, st, dry=True)
         return
-    log(f"START bumi_live: {', '.join(m[0] for m in METHODS)} · risiko {RISK_PCT}%/trade "
+    log(f"START mac_live: {', '.join(m[0] for m in METHODS)} · risiko {RISK_PCT}%/trade "
         f"(skip bila > {MAX_RISK_PCT}%) · SL {SL_ATR} ATR · BE {BE_R}R · akun DEMO")
     last_seen: dict[str, str] = {}
     while True:
