@@ -9,13 +9,16 @@
 //|   kotak opening range 15 mnt, garis level breakout, panah         |
 //|   breakout, entry / SL / TP posisi ORB. Chart non-XAU (mis.       |
 //|   ETHUSD) hanya menggambar ORB dari orb_area_<simbol>.csv.        |
+//| + garis EMA50 H1 (filter bias Pro & ORB XAU), dihitung langsung   |
+//|   dari bar H1: hijau = bias BUY (close > EMA & EMA naik > 0.1 ATR  |
+//|   / 3 bar), merah = bias SELL, abu-abu = netral; label bias kini.  |
 //| Canvas dipakai karena kotak bawaan MT5 tidak bisa transparan dan  |
 //| area yang bertumpuk jadi putih (XOR).                             |
 //| Hanya tampilan — tidak membuka order apa pun.                     |
 //+------------------------------------------------------------------+
 #property copyright   "ea-project"
-#property version     "2.30"
-#property description "Marker POI strategi sendiri (FVG/OB/IFVG M15, armed, CHoCH M5, entry/SL/TP) + area ORB New York"
+#property version     "2.40"
+#property description "Marker POI strategi sendiri (FVG/OB/IFVG M15, armed, CHoCH M5, entry/SL/TP) + area ORB New York + EMA50 H1 bias"
 #property indicator_chart_window
 #property indicator_plots 0
 
@@ -40,8 +43,19 @@ input bool   InpShowOrb    = true;              // tampilkan area ORB New York
 input string InpFileOrb    = "orb_area.csv";    // file ORB XAUUSD (simbol lain: orb_area_<simbol>.csv)
 input color  InpOrbColor   = C'150,90,230';     // kotak opening range ORB
 input int    InpOrbHoldMin = 360;               // panjang garis level ORB (menit sejak NY buka)
+input bool   InpShowEma    = true;              // tampilkan EMA50 H1 + status bias (hanya chart XAU)
+input int    InpEmaSpan    = 50;                // = EMA_SPAN pro_live / orb.h1_bias
+input double InpEmaSlope   = 0.1;               // = MIN_SLOPE (× ATR14 H1, kemiringan EMA dalam 3 bar)
+input int    InpEmaWidth   = 2;                 // tebal garis EMA (px)
+input color  InpEmaNeutral = C'150,150,150';    // EMA saat bias netral
 
 #define NAME "PROPOI_canvas"
+#define EMA_BARS 1000                               // bar H1 yang dihitung (EMA adjust=False konvergen jauh sebelum ini)
+
+datetime g_et[];                                     // waktu buka bar H1 (sudah close), lama → baru
+double   g_ev[];                                     // nilai EMA
+int      g_eb[];                                     // bias bar itu: 1 BUY, -1 SELL, 0 netral
+double   g_eslope = 0;                               // kemiringan EMA bar terakhir (× ATR)
 
 struct Row { string rec, dir, kind; datetime t1; double p1, p2, p3; int flag; };
 Row     g_rows[];
@@ -67,6 +81,89 @@ void ReadAll()
       ReadFile(InpFile);
    if(InpShowOrb)
       ReadFile(OrbFile());
+   CalcEma();
+  }
+
+//--- EMA50 H1 + bias, identik dengan orb.h1_bias / pro_strategy.Market (ewm adjust=False, ATR = rata2 high-low 14)
+void CalcEma()
+  {
+   ArrayResize(g_et, 0);
+   if(!InpShowEma || !IsGold())
+      return;
+   MqlRates r[];
+   ArraySetAsSeries(r, false);
+   int n = CopyRates(_Symbol, PERIOD_H1, 1, EMA_BARS, r);   // mulai shift 1 → hanya bar yang sudah close
+   if(n < InpEmaSpan + 20)
+      return;
+   ArrayResize(g_et, n);
+   ArrayResize(g_ev, n);
+   ArrayResize(g_eb, n);
+   double a = 2.0 / (InpEmaSpan + 1.0), sum_rng = 0;
+   double rng[];
+   ArrayResize(rng, n);
+   for(int i = 0; i < n; i++)
+     {
+      g_et[i] = r[i].time;
+      g_ev[i] = i == 0 ? r[i].close : a * r[i].close + (1 - a) * g_ev[i - 1];
+      rng[i] = r[i].high - r[i].low;
+      sum_rng += rng[i];
+      if(i >= 14)
+         sum_rng -= rng[i - 14];
+      g_eb[i] = 0;
+      if(i >= 13 && i >= 3)
+        {
+         double atr = sum_rng / 14.0, slope = g_ev[i] - g_ev[i - 3];
+         if(r[i].close > g_ev[i] && slope > InpEmaSlope * atr)
+            g_eb[i] = 1;
+         else if(r[i].close < g_ev[i] && slope < -InpEmaSlope * atr)
+            g_eb[i] = -1;
+         if(i == n - 1 && atr > 0)
+            g_eslope = slope / atr;
+        }
+     }
+  }
+
+void DrawEma()
+  {
+   int n = ArraySize(g_et);
+   if(n < 2)
+      return;
+   int xr = g_w - 60;
+   int px = 0, py = 0;
+   bool have = false;
+   for(int i = 0; i < n; i++)
+     {
+      int x, y;
+      if(!XY(g_et[i], g_ev[i], x, y))
+        {
+         have = false;
+         continue;
+        }
+      if(have && x >= 0 && px < xr && x != px)
+        {
+         color c = g_eb[i] == 1 ? InpBuyColor : g_eb[i] == -1 ? InpSellColor : InpEmaNeutral;
+         int xa = px, ya = py, xb = x, yb = y;
+         if(xb > xr)                                 // potong di tepi skala harga
+           {
+            yb = ya + (int)MathRound((double)(yb - ya) * (xr - xa) / (double)(xb - xa));
+            xb = xr;
+           }
+         if(InpEmaWidth > 1)
+            g_cv.LineThick(xa, ya, xb, yb, ColorToARGB(c, 220), InpEmaWidth, STYLE_SOLID, LINE_END_ROUND);
+         else
+            g_cv.LineAA(xa, ya, xb, yb, ColorToARGB(c, 220));
+        }
+      px = x;
+      py = y;
+      have = true;
+     }
+   //--- label status bias bar H1 terakhir yang sudah close
+   int b = g_eb[n - 1];
+   color c = b == 1 ? InpBuyColor : b == -1 ? InpSellColor : InpEmaNeutral;
+   string st = b == 1 ? "bias BUY" : b == -1 ? "bias SELL" : "netral";
+   string txt = "EMA" + IntegerToString(InpEmaSpan) + " H1 " + DoubleToString(g_ev[n - 1], _Digits) + " · " + st +
+                " · slope " + DoubleToString(g_eslope, 2) + " ATR (min " + DoubleToString(InpEmaSlope, 2) + ")";
+   g_cv.TextOut(8, 24, txt, ColorToARGB(c, 255));   // di bawah teks simbol/OHLC bawaan chart
   }
 
 int OnInit()
@@ -263,6 +360,7 @@ void Render()
      }
    g_cv.Erase(0x00000000);
    g_cv.FontSet("Segoe UI", -80);
+   DrawEma();
    int n = ArraySize(g_rows);
    for(int i = 0; i < n; i++)
      {
