@@ -32,7 +32,7 @@ def fetch_from_mt5(start: datetime, end: datetime, symbol: str = settings.SYMBOL
                    tf: str = "M1") -> pd.DataFrame:
     import MetaTrader5 as mt5  # import lokal: modul lain tetap bisa jalan tanpa MT5
 
-    if not mt5.initialize():
+    if not mt5.initialize(**settings.mt5_init_kwargs()):
         raise RuntimeError(f"MT5 initialize gagal: {mt5.last_error()}")
     try:
         mt5.symbol_select(symbol, True)

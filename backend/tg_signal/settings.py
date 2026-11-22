@@ -47,6 +47,13 @@ PIP_SIZE = 0.10                                 # 1 pip XAUUSD = $0.10 harga (ke
 USD_PER_PIP_001 = 0.10                          # 0.01 lot × 100 oz × $0.10
 # Offset jam server MT5 terhadap UTC (Exness = 0). Bar MT5 dikonversi ke UTC.
 MT5_UTC_OFFSET_H = _f("MT5_UTC_OFFSET_H", 0)
+# Terminal MT5 yang dipakai SEMUA modul. Wajib eksplisit: bila >1 terminal jalan, initialize() tanpa path
+# menempel ke terminal sembarang (pernah: dashboard membaca akun REAL di terminal "COPY").
+MT5_TERMINAL_PATH = os.getenv("MT5_TERMINAL_PATH", r"C:\Program Files\MetaTrader 5 EXNESS\terminal64.exe")
+
+
+def mt5_init_kwargs() -> dict:
+    return {"path": MT5_TERMINAL_PATH} if MT5_TERMINAL_PATH else {}
 M1_CACHE_PATH = DATA_DIR / f"m1_{SYMBOL}.csv.gz"
 
 

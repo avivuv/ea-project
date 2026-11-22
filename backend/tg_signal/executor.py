@@ -58,7 +58,7 @@ class MT5Executor:
 
     # ── koneksi ─────────────────────────────────────────────────────────────
     def connect(self) -> None:
-        if not mt5.initialize():
+        if not mt5.initialize(**settings.mt5_init_kwargs()):
             raise RuntimeError(f"MT5 initialize gagal: {mt5.last_error()}")
         acc = mt5.account_info()
         if acc is None:

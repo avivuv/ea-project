@@ -145,7 +145,7 @@ def mt5_trades(specs: list[Spec], since: datetime) -> list[dict] | None:
     """Posisi (tutup & terbuka) dari MT5 untuk magic `specs`. None bila MT5 tidak terhubung."""
     try:
         import MetaTrader5 as mt5
-        if not mt5.initialize():
+        if not mt5.initialize(**settings.mt5_init_kwargs()):
             return None
     except Exception:
         return None

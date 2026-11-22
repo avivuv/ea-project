@@ -21,6 +21,8 @@ import json
 import os
 import re
 import sqlite3
+import subprocess
+import time
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -35,6 +37,14 @@ from tg_signal.orb_live import SPECS as ORB_SPECS
 
 WIB = timedelta(hours=7)
 REFRESH_SEC = 3
+AUTO_TAB_SEC = 300      # didiamkan selama ini → pindah ke tab berikutnya (lalu tiap AUTO_TAB_SEC lagi)
+# Browser mengirim event 'dash_active' (maks. 1×/5 detik) saat ada mouse/keyboard/sentuh/scroll.
+ACTIVITY_JS = """<script>
+(() => { let t = 0; const f = () => { const n = Date.now(); if (n - t > 5000) { t = n;
+  try { emitEvent('dash_active'); } catch (e) {} } };
+  ['mousemove', 'mousedown', 'keydown', 'touchstart', 'wheel', 'scroll']
+    .forEach(e => document.addEventListener(e, f, {passive: true, capture: true})); })();
+</script>"""
 D = settings.DATA_DIR
 
 # Token warna (dataviz reference palette, mode gelap)
@@ -168,7 +178,7 @@ GROUPS = [
                   "heartbeat", 60)],
           pause=settings.PAUSE_TG, pause_note="posisi dan pending yang sudah ada tetap dikelola",
           idle="Menunggu sinyal.", extra=tg_extra),
-    Group("swing", "Swing Donchian", "trending_up", "Swing trend-following — XAUUSD, BTCUSD, USDJPY",
+    Group("swing", "Swing Donchian", "trending_up", "Swing trend-following — XAUUSD dan BTCUSD",
           ["Entry saat harga breakout channel Donchian, searah tren D1.",
            "Tanpa TP; posisi dijaga trailing stop berbasis ATR (lebar per metode, XAU H4 + breakeven 1R).",
            "Risiko 0,5% saldo per trade; trade dilewati jika lot minimum berisiko lebih dari 2% saldo.",
@@ -176,8 +186,7 @@ GROUPS = [
           [Method(i, s, mg, desc, "swing_live.log", "swing_heartbeat") for i, s, desc, mg in (
               ("XAU_D1_DON20", "XAUUSD", "Donchian D1 20 bar, trailing 3 ATR (ATR terbaru)", 26111201),
               ("XAU_H4_DON55", "XAUUSD", "Donchian H4 55 bar, BE 1R + trailing 5 ATR", 26111202),
-              ("BTC_H4_DON55", "BTCUSD", "Donchian H4 55 bar, trailing 6 ATR (ATR terbaru)", 26111203),
-              ("JPY_H4_DON55", "USDJPY", "Donchian H4 55 bar, trailing 4 ATR — entry baru dimatikan", 26111204))],
+              ("BTC_H4_DON55", "BTCUSD", "Donchian H4 55 bar, trailing 6 ATR (ATR terbaru)", 26111203))],
           pause=settings.PAUSE_SWING, pause_note="trailing stop tetap berjalan", idle="Menunggu breakout."),
     Group("mac", "Trend MA Cross", "show_chart", "Trend MA Cross — XAUUSD H4 dan H1",
           ["Entry BUY saat SMA 5 naik melewati SMA 13, 21, dan 34 (SELL sebaliknya), "
@@ -243,10 +252,14 @@ def snapshot() -> dict:
     posisi). Gagal → dict kosong (dashboard tetap jalan)."""
     try:
         import MetaTrader5 as mt5
-        if not mt5.initialize():
+        if not mt5.initialize(**settings.mt5_init_kwargs()):
             return {}
         acc = mt5.account_info()
         term = mt5.terminal_info()
+        if acc is None:
+            return {}
+        TERM_LABEL[settings.MT5_TERMINAL_PATH] = f"{acc.name} #{acc.login}"
+        CUR["code"] = acc.currency or "USD"
         pos = [{"ticket": p.ticket, "magic": p.magic, "symbol": p.symbol, "dir": "BUY" if p.type == 0 else "SELL",
                 "lot": p.volume, "entry": p.price_open, "sl": p.sl, "tp": p.tp, "price": p.price_current,
                 "profit": p.profit + p.swap, "time": datetime.fromtimestamp(p.time, timezone.utc)}
@@ -279,9 +292,41 @@ def snapshot() -> dict:
         return {"balance": acc.balance, "equity": acc.equity, "margin": acc.margin,
                 "free": acc.margin_free, "level": acc.margin_level, "currency": acc.currency,
                 "demo": acc.trade_mode == mt5.ACCOUNT_TRADE_MODE_DEMO, "algo": term.trade_allowed,
-                "server": acc.server, "pos": pos, "pend": pend, "closed": closed}
+                "server": acc.server, "login": acc.login, "name": acc.name, "pos": pos, "pend": pend, "closed": closed}
     except Exception:
         return {}
+
+
+# ── pilihan terminal MT5 ────────────────────────────────────────────────────
+# Satu proses Python hanya bisa terhubung ke satu terminal; ganti = shutdown lalu initialize(path) baru.
+# Pilihan disimpan di data/ agar bertahan saat dashboard di-restart. Runner TIDAK terpengaruh
+# (mereka memakai MT5_TERMINAL_PATH dari .env / default settings).
+TERM_FILE = D / "dash_terminal.txt"
+TERM_LABEL: dict[str, str] = {}     # path → "nama #login" (terisi setelah pernah tersambung)
+if TERM_FILE.exists() and TERM_FILE.read_text(encoding="utf-8").strip():
+    settings.MT5_TERMINAL_PATH = TERM_FILE.read_text(encoding="utf-8").strip()
+
+
+def running_terminals() -> list[str]:
+    """Path terminal64.exe yang sedang jalan (+ pilihan saat ini), tanpa duplikat."""
+    try:
+        out = subprocess.run(["powershell", "-NoProfile", "-Command",
+                              "Get-Process terminal64 -ErrorAction SilentlyContinue | ForEach-Object Path"],
+                             capture_output=True, text=True, timeout=10).stdout
+        found = [ln.strip() for ln in out.splitlines() if ln.strip()]
+    except Exception:
+        found = []
+    cur = settings.MT5_TERMINAL_PATH
+    return list(dict.fromkeys(([cur] if cur else []) + found))
+
+
+def set_terminal(path: str) -> None:
+    import MetaTrader5 as mt5
+    if path == settings.MT5_TERMINAL_PATH:
+        return
+    mt5.shutdown()
+    settings.MT5_TERMINAL_PATH = path
+    TERM_FILE.write_text(path, encoding="utf-8")
 
 
 def file_status(m: Method) -> tuple[str, str]:
@@ -329,8 +374,23 @@ def tone(x: float) -> str:
     return "good" if x > 0.005 else "bad" if x < -0.005 else ""
 
 
+# Mata uang akun yang dipantau (USD, USC, IDR, …) — diisi snapshot().
+CUR = {"code": "USD"}
+NO_DECIMALS = {"IDR", "JPY", "VND", "KRW"}
+
+
+def cur() -> str:
+    return CUR["code"]
+
+
+def money(x: float, sign: bool = False) -> str:
+    d = 0 if cur() in NO_DECIMALS else 2
+    return f"{x:+,.{d}f}" if sign else f"{x:,.{d}f}"
+
+
 def usd(x: float) -> str:
-    return f"{x:+,.2f}"
+    """Nilai profit bertanda dalam mata uang akun (nama lama dipertahankan)."""
+    return money(x, sign=True)
 
 
 # ── Komponen UI ─────────────────────────────────────────────────────────────
@@ -357,7 +417,7 @@ def cum_chart():
                   "axisLabel": {"color": C["muted"]}},
         "yAxis": {"type": "value", "splitLine": {"lineStyle": {"color": C["grid"]}},
                   "axisLabel": {"color": C["muted"]}},
-        "series": [{"type": "line", "name": "Profit kumulatif (USD)", "data": [], "showSymbol": False,
+        "series": [{"type": "line", "name": "Profit kumulatif", "data": [], "showSymbol": False,
                     "lineStyle": {"width": 2, "color": C["series"]}, "itemStyle": {"color": C["series"]},
                     "markLine": {"silent": True, "symbol": "none", "lineStyle": {"color": C["axis"], "type": "solid"},
                                  "data": [{"yAxis": 0}], "label": {"show": False}}}],
@@ -371,7 +431,7 @@ TRADE_COLS = [
     {"name": "entry", "label": "Entry", "field": "entry", "align": "right"},
     {"name": "exit", "label": "Exit", "field": "exit", "align": "right"},
     {"name": "hasil", "label": "Hasil", "field": "hasil", "align": "left"},
-    {"name": "usd", "label": "USD", "field": "usd", "align": "right"},
+    {"name": "usd", "label": "Profit", "field": "usd", "align": "right"},
 ]
 
 
@@ -429,7 +489,7 @@ def method_tab(g: Group, refresh_all: Callable[[], None]) -> Callable[[dict], No
                 cards[m.magic] = (st, v, body, ex)
 
     with ui.element("div").classes("card w-full"):
-        ui.label("Profit kumulatif (USD, trade tutup)").classes("label")
+        ui.label("Profit kumulatif (trade tutup, mata uang akun)").classes("label")
         chart = cum_chart()
         no_trade = ui.label("Belum ada trade tutup").classes("sub")
 
@@ -469,12 +529,12 @@ def method_tab(g: Group, refresh_all: Callable[[], None]) -> Callable[[dict], No
             set_val(v_fl, "MT5 ?", "warn")
             s_fl.text = "MT5 tidak terhubung"
         else:
-            set_val(v_fl, f"{usd(fl)} USD" if pos else "0.00 USD", tone(fl))
+            set_val(v_fl, f"{usd(fl)} {cur()}" if pos else f"{money(0)} {cur()}", tone(fl))
             s_fl.text = f"{len(pos)} posisi" + (f" · {len(pend)} pending" if pend else "")
         d_tot = sum(c["usd"] for c in today)
-        set_val(v_day, f"{usd(d_tot)} USD" if today else "-", tone(d_tot))
+        set_val(v_day, f"{usd(d_tot)} {cur()}" if today else "-", tone(d_tot))
         s_day.text = f"{len(today)} trade · untung {sum(c['usd'] > 0 for c in today)}"
-        set_val(v_tot, f"{usd(tot)} USD" if closed else "-", tone(tot))
+        set_val(v_tot, f"{usd(tot)} {cur()}" if closed else "-", tone(tot))
         s_tot.text = f"{len(closed)} trade (365 hari)"
         set_val(v_wr, f"{100 * len(win) / len(closed):.0f}%" if closed else "-")
         avg_w = sum(c["usd"] for c in win) / len(win) if win else 0
@@ -494,7 +554,7 @@ def method_tab(g: Group, refresh_all: Callable[[], None]) -> Callable[[dict], No
             with body:
                 if mp:
                     f = sum(p["profit"] for p in mp)
-                    set_val(v, f"{usd(f)} USD", tone(f))
+                    set_val(v, f"{usd(f)} {cur()}", tone(f))
                     for p in mp:
                         ui.label(f"#{p['ticket']} {p['dir']} {p['lot']:g} @ {px(p['entry'])} · SL {px(p['sl'])}"
                                  + (f" · TP {px(p['tp'])}" if p["tp"] else "") + f" · sekarang {px(p['price'])} · "
@@ -507,7 +567,7 @@ def method_tab(g: Group, refresh_all: Callable[[], None]) -> Callable[[dict], No
                 for o in mo:
                     ui.label(f"LIMIT {o['dir']} @ {px(o['price'])} · SL {px(o['sl'])} · TP {px(o['tp'])} · "
                              f"{(o['time'] + WIB):%d/%m %H:%M}").classes("sub num warn")
-                ui.label(f"tutup: {len(mc)} trade · {usd(mt)} USD").classes("sub num")
+                ui.label(f"tutup: {len(mc)} trade · {usd(mt)} {cur()}").classes("sub num")
             if ex:
                 ex.text = g.extra(m)
 
@@ -667,23 +727,22 @@ def balance_tab() -> Callable[[dict], None]:
         if not snap:
             acc_info.text = "⚠️ MT5 tidak terhubung"
             return
-        acc_info.text = (f"{snap['server']} · {'akun DEMO' if snap['demo'] else '⚠️ BUKAN DEMO'} · "
-                         f"{snap['currency']}" + ("" if snap["algo"] else " · ⚠️ Algo Trading MATI"))
+        acc_info.text = (f"{snap['name']} #{snap['login']} · {snap['server']} · {snap['currency']}" + ("" if snap["algo"] else " · ⚠️ Algo Trading MATI"))
         pos, closed = snap["pos"], snap["closed"]
         start = day_start_utc()
         fl = sum(p["profit"] for p in pos)
-        set_val(v_bal, f"${snap['balance']:,.2f}")
-        s_bal.text = "akun demo" if snap["demo"] else "⚠️ BUKAN DEMO"
-        set_val(v_eq, f"${snap['equity']:,.2f}")
+        set_val(v_bal, f"{money(snap['balance'])} {cur()}")
+        s_bal.text = snap["name"]
+        set_val(v_eq, f"{money(snap['equity'])} {cur()}")
         s_eq.text = f"selisih {usd(snap['equity'] - snap['balance'])}"
-        set_val(v_fl, f"{usd(fl)} USD", tone(fl))
+        set_val(v_fl, f"{usd(fl)} {cur()}", tone(fl))
         s_fl.text = f"{len(pos)} posisi · {len(snap['pend'])} pending"
         today = [c for c in closed if c["time"] >= start]
         d_tot = sum(c["usd"] for c in today)
-        set_val(v_day, f"{usd(d_tot)} USD" if today else "-", tone(d_tot))
+        set_val(v_day, f"{usd(d_tot)} {cur()}" if today else "-", tone(d_tot))
         s_day.text = f"{len(today)} trade semua metode"
-        set_val(v_mg, f"${snap['margin']:,.2f}")
-        s_mg.text = f"bebas ${snap['free']:,.2f}" + (f" · level {snap['level']:,.0f}%" if snap["margin"] else "")
+        set_val(v_mg, f"{money(snap['margin'])} {cur()}")
+        s_mg.text = f"bebas {money(snap['free'])} {cur()}" + (f" · level {snap['level']:,.0f}%" if snap["margin"] else "")
 
         rows = []
         known = {m.magic for m in ALL_METHODS}
@@ -728,6 +787,21 @@ def build(start_tab: str = "") -> None:
             head = ui.label("").classes("sub num")
         with ui.row().classes("items-center gap-3"):
             g_state = ui.label("").classes("font-semibold")
+
+            def term_opts() -> dict:
+                return {p: TERM_LABEL.get(p, Path(p).parent.name) for p in running_terminals()}
+
+            def on_term(e) -> None:
+                if e.value:
+                    set_terminal(e.value)
+                    refresh()
+                    term_sel.set_options(term_opts(), value=e.value)
+
+            term_sel = ui.select(term_opts(), value=settings.MT5_TERMINAL_PATH, label="Terminal MT5",
+                                 on_change=on_term).props("dense outlined options-dense").classes("min-w-[220px]")                 .tooltip("Terminal MT5 yang dipantau dashboard (tidak mengubah runner)")
+            term_sel.on("popup-show", lambda: term_sel.set_options(term_opts(), value=term_sel.value))
+            auto_tab = ui.switch("Auto pindah tab", value=True).props("dense color=primary") \
+                .tooltip(f"Didiamkan {AUTO_TAB_SEC // 60} menit → pindah ke tab berikutnya")
             pause_btn = ui.button("").props("unelevated")
 
     with ui.tabs().classes("w-full").props("align=left inline-label") as tabs:
@@ -780,11 +854,11 @@ def build(start_tab: str = "") -> None:
         pause_btn.props(f"color={'warning' if paused else 'primary'}")
         if snap:
             fl = sum(p["profit"] for p in snap["pos"])
-            head.text = (f"saldo ${snap['balance']:,.2f} · equity ${snap['equity']:,.2f} · floating {usd(fl)} · "
-                         + ("DEMO" if snap["demo"] else "⚠️ BUKAN DEMO")
+            head.text = (f"{snap['name']} #{snap['login']} · saldo {money(snap['balance'])} {cur()} · "
+                         f"equity {money(snap['equity'])} {cur()} · floating {usd(fl)} {cur()}"
                          + ("" if snap["algo"] else " · ⚠️ Algo Trading MATI"))
         else:
-            head.text = "⚠️ MT5 tidak terhubung"
+            head.text = f"⚠️ MT5 tidak terhubung ({Path(settings.MT5_TERMINAL_PATH or '-').parent.name})"
         for f in refreshers:
             try:
                 f(snap)
@@ -792,7 +866,30 @@ def build(start_tab: str = "") -> None:
                 print(f"refresh gagal: {e!r}")
 
     refresh()
+    term_sel.set_options(term_opts(), value=term_sel.value)      # label nama akun setelah snapshot pertama
     ui.timer(REFRESH_SEC, refresh)
+
+    # Auto pindah tab saat didiamkan
+    tab_list = [t_bal] + [tab_of[g.key] for g in GROUPS]
+    idle = {"last": time.monotonic()}
+
+    def mark_active(_=None) -> None:
+        idle["last"] = time.monotonic()
+
+    def rotate() -> None:
+        if not auto_tab.value or time.monotonic() - idle["last"] < AUTO_TAB_SEC:
+            return
+        cur = tabs.value
+        cur = cur.props.get("name") if hasattr(cur, "props") else cur
+        names = [t.props.get("name") for t in tab_list]
+        i = names.index(cur) if cur in names else -1
+        tabs.set_value(tab_list[(i + 1) % len(tab_list)])
+        mark_active()
+
+    ui.add_body_html(ACTIVITY_JS)
+    ui.on("dash_active", mark_active)
+    auto_tab.on_value_change(mark_active)
+    ui.timer(5, rotate)
 
 
 PASSWORD = os.getenv("TG_DASH_PASSWORD", "")
