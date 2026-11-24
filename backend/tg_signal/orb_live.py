@@ -324,6 +324,8 @@ def main() -> None:
         while True:
             spec.heartbeat.touch()
             try:
+                if msg := ex.ensure_connected():
+                    log.warning(msg)
                 trader.step()
             except Exception:
                 log.exception("siklus gagal")

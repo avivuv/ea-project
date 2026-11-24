@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 
 import MetaTrader5 as mt5
 
-from tg_signal import settings
+from tg_signal import mt5_conn, settings
 
 
 @dataclass
@@ -58,17 +58,16 @@ class MT5Executor:
 
     # ── koneksi ─────────────────────────────────────────────────────────────
     def connect(self) -> None:
-        if not mt5.initialize(**settings.mt5_init_kwargs()):
-            raise RuntimeError(f"MT5 initialize gagal: {mt5.last_error()}")
-        acc = mt5.account_info()
-        if acc is None:
-            raise RuntimeError("MT5 belum login ke akun")
-        if acc.trade_mode != mt5.ACCOUNT_TRADE_MODE_DEMO:
-            mt5.shutdown()
-            raise RuntimeError(f"DITOLAK: akun {acc.login} bukan akun DEMO. Program ini hanya untuk demo.")
-        if not mt5.symbol_select(self.symbol, True):
-            raise RuntimeError(f"Simbol {self.symbol} tidak tersedia")
+        mt5_conn.connect([self.symbol])
         self.info = mt5.symbol_info(self.symbol)
+
+    def ensure_connected(self) -> str | None:
+        """Panggil di awal tiap siklus: sambung ulang bila terminal MT5 sempat restart.
+        Return pesan log bila baru reconnect; raise bila terminal belum siap."""
+        msg = mt5_conn.ensure([self.symbol])
+        if msg:
+            self.info = mt5.symbol_info(self.symbol)
+        return msg
 
     def status(self) -> dict:
         acc, term = mt5.account_info(), mt5.terminal_info()

@@ -304,6 +304,8 @@ def main() -> None:
         while True:
             HEARTBEAT.touch()
             try:
+                if msg := ex.ensure_connected():
+                    log.warning(msg)
                 trader.on_bar()
             except Exception:
                 log.exception("siklus gagal")

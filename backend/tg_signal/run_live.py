@@ -615,6 +615,14 @@ async def run(mode: str) -> None:
     if latest:
         state["last_id"] = latest[0].id               # pesan lama tidak dieksekusi ulang
 
+    def _ensure_mt5() -> None:
+        """Sambung ulang MT5 bila terminal sempat restart (gagal → handler di bawah mencatat errornya)."""
+        try:
+            if msg := ex.ensure_connected():
+                log.warning(msg)
+        except Exception as e:
+            log.error("MT5 belum tersambung: %s", e)
+
     def process(msg, via: str, is_edit: bool) -> None:
         """Satu jalur untuk push (event) dan polling. Sinkron → tidak ada balapan antar keduanya."""
         if not in_topic(msg, settings.TG_TOPIC_ID):
@@ -635,7 +643,8 @@ async def run(mode: str) -> None:
                               settings.TG_DEFAULT_SL_PIPS, msg.sender_id, _sender_name(msg))
         if kind == "UNCHANGED":
             return
-        lag = (datetime.now(timezone.utc) - msg.date).total_seconds()
+        _ensure_mt5()
+        lag =(datetime.now(timezone.utc) - msg.date).total_seconds()
         first = (msg.message or "").strip().splitlines()[0][:50] if msg.message else ""
         log.info("pesan #%s [%s] via %s, jeda %.0f dtk | %s", msg.id, kind, via, lag, first)
         if kind == "SIGNAL" and (not is_edit or fresh_edit):
@@ -682,6 +691,8 @@ async def run(mode: str) -> None:
     async def sync_loop() -> None:
         while True:
             try:
+                if msg := ex.ensure_connected():
+                    log.warning(msg)
                 trader.sync()
             except Exception:
                 log.exception("sync gagal")

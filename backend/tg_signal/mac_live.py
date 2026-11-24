@@ -223,6 +223,8 @@ def main() -> None:
     last_seen: dict[str, str] = {}
     while True:
         try:
+            if msg := bk.ensure_connected():
+                log(msg)
             changed = False
             for sym in {m[1] for m in METHODS}:
                 cb = str(bk.current_bar_time(sym))

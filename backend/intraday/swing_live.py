@@ -31,7 +31,7 @@ import numpy as np
 import pandas as pd
 
 from intraday import swing as sw
-from tg_signal import settings
+from tg_signal import mt5_conn, settings
 
 RISK_PCT = 0.5
 MAX_RISK_PCT = 2.0
@@ -88,14 +88,12 @@ class Broker:
     def __init__(self):
         import MetaTrader5 as mt5
         self.mt5 = mt5
-        if not mt5.initialize():
-            raise RuntimeError(f"MT5 initialize gagal: {mt5.last_error()}")
-        acc = mt5.account_info()
-        if acc is None or acc.trade_mode != mt5.ACCOUNT_TRADE_MODE_DEMO:
-            mt5.shutdown()
-            raise RuntimeError("DITOLAK: akun yang login bukan akun DEMO.")
-        for _, s, _, _ in METHODS:
-            mt5.symbol_select(s, True)
+        self.symbols = sorted({s for _, s, _, _ in METHODS})
+        mt5_conn.connect(self.symbols, strict=False)     # path terminal dari settings + tolak non-DEMO
+
+    def ensure_connected(self) -> str | None:
+        """Sambung ulang bila terminal MT5 sempat restart (pesan log bila reconnect, raise bila belum siap)."""
+        return mt5_conn.ensure(self.symbols, strict=False)
 
     def h1(self, symbol: str) -> pd.DataFrame:
         """Bar H1 yang SUDAH close (bar berjalan dibuang), waktu UTC, spread dalam harga."""
@@ -337,6 +335,8 @@ def main() -> None:
     last_seen: dict[str, str] = {}
     while True:
         try:
+            if msg := bk.ensure_connected():
+                log(msg)
             changed = False
             for sym in {m[1] for m in METHODS}:
                 cb = str(bk.current_bar_time(sym))
