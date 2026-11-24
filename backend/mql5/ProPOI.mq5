@@ -403,17 +403,14 @@ void DrawMac()
             if(!XY(g_bt[k][i], buy ? g_bl[k][i] : g_bh[k][i], x, y) || x < 0 || x >= g_w - 60)
                continue;
             color c = buy ? InpBuyColor : InpSellColor;
-            int dy = k == 1 ? 16 : 0;                  // H4 sedikit lebih jauh agar tidak menumpuk dengan H1
-            g_cv.TextOut(x, buy ? y + 4 + dy : y - 26 - dy, buy ? "▲" : "▼", ColorToARGB(c, 255), TA_CENTER);
-            g_cv.TextOut(x + 8, buy ? y + 6 + dy : y - 24 - dy, "MA CROSS " + tfs[k] + (buy ? " BUY" : " SELL"),
-                         ColorToARGB(c, 230));
+            Mark(x, y, buy, "MA CROSS " + tfs[k] + (buy ? " BUY" : " SELL"), c);
            }
       int up = g_bup[k], sl = g_bslope[k];
       string pos = up == 1 ? "MA5 di atas 3 MA" : up == -1 ? "MA5 di bawah 3 MA" : "MA5 campur";
       string sls = sl == 1 ? "EMA200 naik" : sl == -1 ? "EMA200 turun" : "EMA200 datar";
       color c = (up != 0 && up == sl) ? (up == 1 ? InpBuyColor : InpSellColor) : InpEmaNeutral;
-      g_cv.TextOut(8, 40 + 16 * k, "Trend MA Cross " + tfs[k] + (k == kl ? " (garis)" : "") + " · " + pos + " · " + sls,
-                   ColorToARGB(c, 255));
+      Txt(8, 40 + 16 * k, "Trend MA Cross " + tfs[k] + (k == kl ? " (garis)" : "") + " · " + pos + " · " + sls,
+          ColorToARGB(c, 255), 0, 0);
      }
   }
 
@@ -496,7 +493,7 @@ void DrawEma()
    string st = b == 1 ? "bias BUY" : b == -1 ? "bias SELL" : "netral";
    string txt = "EMA" + IntegerToString(InpEmaSpan) + " H1 " + DoubleToString(g_ev[n - 1], _Digits) + " · " + st +
                 " · slope " + DoubleToString(g_eslope, 2) + " ATR (min " + DoubleToString(InpEmaSlope, 2) + ")";
-   g_cv.TextOut(8, 24, txt, ColorToARGB(c, 255));   // di bawah teks simbol/OHLC bawaan chart
+   Txt(8, 24, txt, ColorToARGB(c, 255), 0, 0);   // di bawah teks simbol/OHLC bawaan chart
   }
 
 int OnInit()
@@ -587,12 +584,73 @@ void Box(datetime t1, double lo, double hi, color c, uchar fill_a, uchar line_a,
       g_cv.Rectangle(x1 + i, y1 + i, xr - i, y2 - i, ColorToARGB(c, line_a));
   }
 
+//--- semua teks lewat Txt/Mark: posisi teks yang sudah ditulis dicatat (reset tiap Render), teks baru
+//    yang menabrak digeser vertikal sebesar step (negatif = ke atas) sampai bebas, agar tidak menumpuk
+int g_tx1[], g_tx2[], g_ty1[], g_ty2[];
+int g_tn = 0;
+
+bool TxtHit(int x1, int x2, int y1, int y2)
+  {
+   for(int k = 0; k < g_tn; k++)
+      if(x1 < g_tx2[k] && x2 > g_tx1[k] && y1 < g_ty2[k] && y2 > g_ty1[k])
+         return(true);
+   return(false);
+  }
+
+void TxtAdd(int x1, int x2, int y1, int y2)
+  {
+   ArrayResize(g_tx1, g_tn + 1, 64);
+   ArrayResize(g_tx2, g_tn + 1, 64);
+   ArrayResize(g_ty1, g_tn + 1, 64);
+   ArrayResize(g_ty2, g_tn + 1, 64);
+   g_tx1[g_tn] = x1;
+   g_tx2[g_tn] = x2;
+   g_ty1[g_tn] = y1;
+   g_ty2[g_tn] = y2;
+   g_tn++;
+  }
+
+int FreeY(int x1, int x2, int y, int h, int step)
+  {
+   int y0 = y;
+   for(int pass = 0; pass < 2 && step != 0; pass++)       // arah step dulu; mentok tepi chart -> arah sebaliknya
+     {
+      int s = pass == 0 ? step : -step;
+      y = y0;
+      for(int guard = 0; guard < 25 && TxtHit(x1, x2, y, y + h); guard++)
+         y += s;
+      if(y >= 0 && y + h <= g_h && !TxtHit(x1, x2, y, y + h))
+         break;
+      y = y0;
+     }
+   TxtAdd(x1, x2, y, y + h);
+   return(y);
+  }
+
+int Txt(int x, int y, const string txt, uint clr, uint align = 0, int step = -14)
+  {
+   int w = g_cv.TextWidth(txt), h = 14;
+   int x1 = align == TA_RIGHT ? x - w : align == TA_CENTER ? x - w / 2 : x;
+   y = FreeY(x1, x1 + w + 2, y, h, step);
+   g_cv.TextOut(x, y, txt, clr, align);
+   return(y);
+  }
+
+//--- tanda sinyal ▲/▼ + label di bar (buy: di bawah low, sell: di atas high), digeser bersama bila menabrak
+void Mark(int x, int y, bool buy, const string txt, color c)
+  {
+   int w = g_cv.TextWidth(txt);
+   int top = FreeY(x - 6, x + 10 + w, buy ? y + 4 : y - 26, 16, buy ? 16 : -16);
+   g_cv.TextOut(x, top, buy ? "▲" : "▼", ColorToARGB(c, 255), TA_CENTER);
+   g_cv.TextOut(x + 8, top + 2, txt, ColorToARGB(c, 230));
+  }
+
 void Label(datetime t, double p, const string txt, color c, uchar a = 255)
   {
    int x, y;
    if(!XY(t, p, x, y))
       return;
-   g_cv.TextOut(ClampX(x) + 3, y - 13, txt, ColorToARGB(c, a));
+   Txt(ClampX(x) + 3, y - 13, txt, ColorToARGB(c, a));
   }
 
 //--- kotak dengan batas waktu kiri-kanan (area ORB)
@@ -642,10 +700,10 @@ void Choch(const Row &r)
       DashRight(r.t1, r.p1, InpArmedColor, 230);
       int x, y;
       if(XY(r.t1, r.p1, x, y))
-         g_cv.TextOut(g_w - 64, buy ? y - 14 : y + 2,
+         Txt(g_w - 64, buy ? y - 14 : y + 2,
                       "level CHoCH M5 " + DoubleToString(r.p1, _Digits) +
                       (buy ? " · tunggu close di atas" : " · tunggu close di bawah"),
-                      ColorToARGB(InpArmedColor, 255), TA_RIGHT);
+                      ColorToARGB(InpArmedColor, 255), TA_RIGHT, buy ? -14 : 14);
       return;
      }
    color c = buy ? InpChochBuy : InpChochSell;
@@ -659,7 +717,8 @@ void Choch(const Row &r)
    g_cv.LineHorizontal(xa, xb, y1 + (buy ? -1 : 1), ColorToARGB(c, 120));
    if(x2 >= 0 && x2 < g_w - 60)
       g_cv.FillCircle(x2, y1, 3, ColorToARGB(c, 255));
-   g_cv.TextOut((xa + xb) / 2, buy ? y1 - 14 : y1 + 2, (buy ? "CHoCH ▲" : "CHoCH ▼"), ColorToARGB(c, 255), TA_CENTER);
+   Txt((xa + xb) / 2, buy ? y1 - 14 : y1 + 2, (buy ? "CHoCH ▲" : "CHoCH ▼"), ColorToARGB(c, 255), TA_CENTER,
+       buy ? -14 : 14);
   }
 
 void HLine(datetime t1, double p, color c, const string txt)
@@ -670,7 +729,7 @@ void HLine(datetime t1, double p, color c, const string txt)
    x = ClampX(x);
    int xr = g_w - 60;
    g_cv.LineHorizontal(x, xr, y, ColorToARGB(c, 230));
-   g_cv.TextOut(xr - 4, y - 13, txt, ColorToARGB(c, 255), TA_RIGHT);
+   Txt(xr - 4, y - 13, txt, ColorToARGB(c, 255), TA_RIGHT);
   }
 
 //--- Swing Donchian: channel per bin, tanda breakout pertama tiap rangkaian, level bin berjalan,
@@ -703,10 +762,7 @@ void DrawDon()
            {
             bool buy = d > 0, ok = (s == d);
             color c = ok ? (buy ? InpBuyColor : InpSellColor) : InpOffColor;
-            int dy = 32 * q;                           // metode kedua sedikit lebih jauh agar tidak menumpuk
-            g_cv.TextOut(x, buy ? y + 4 + dy : y - 26 - dy, buy ? "▲" : "▼", ColorToARGB(c, 255), TA_CENTER);
-            g_cv.TextOut(x + 8, buy ? y + 6 + dy : y - 24 - dy, DonName(q) + (buy ? " BUY" : " SELL") +
-                         (ok ? "" : " (tren D1 ✗)"), ColorToARGB(c, 230));
+            Mark(x, y, buy, DonName(q) + (buy ? " BUY" : " SELL") + (ok ? "" : " (tren D1 ✗)"), c);
            }
         }
       prev = d;
@@ -719,13 +775,13 @@ void DrawDon()
       DashRight(g_dnt[q], g_dnl[q], g_dmc[q], 230);
       int x, y;
       if(XY(g_dnt[q], g_dnh[q], x, y))
-         g_cv.TextOut(g_w - 64, y - 14, DonName(q) + " high " + DoubleToString(g_dnh[q], _Digits) +
+         Txt(g_w - 64, y - 14, DonName(q) + " high " + DoubleToString(g_dnh[q], _Digits) +
                       (g_dtr == 1 ? " · BUY bila close di atas" : " · tren D1 bukan BUY"),
-                      ColorToARGB(g_dtr == 1 ? InpBuyColor : InpTextColor, 255), TA_RIGHT);
+                      ColorToARGB(g_dtr == 1 ? InpBuyColor : InpTextColor, 255), TA_RIGHT, -14);
       if(XY(g_dnt[q], g_dnl[q], x, y))
-         g_cv.TextOut(g_w - 64, y + 2, DonName(q) + " low " + DoubleToString(g_dnl[q], _Digits) +
+         Txt(g_w - 64, y + 2, DonName(q) + " low " + DoubleToString(g_dnl[q], _Digits) +
                       (g_dtr == -1 ? " · SELL bila close di bawah" : " · tren D1 bukan SELL"),
-                      ColorToARGB(g_dtr == -1 ? InpSellColor : InpTextColor, 255), TA_RIGHT);
+                      ColorToARGB(g_dtr == -1 ? InpSellColor : InpTextColor, 255), TA_RIGHT, 14);
      }
    for(int i = PositionsTotal() - 1; i >= 0; i--)
      {
@@ -752,8 +808,8 @@ void DrawDon()
    for(int q = 0; q < g_dm; q++)
       ids += (q > 0 ? ", " : "") + g_dmid[q];
    color c = g_dtr == 1 ? InpBuyColor : g_dtr == -1 ? InpSellColor : InpEmaNeutral;
-   g_cv.TextOut(8, y0, "Swing Donchian (" + ids + ") · tren D1 " + trs + " (EMA200 D1 " +
-                DoubleToString(g_dema, _Digits) + ")", ColorToARGB(c, 255));
+   Txt(8, y0, "Swing Donchian (" + ids + ") · tren D1 " + trs + " (EMA200 D1 " +
+                DoubleToString(g_dema, _Digits) + ")", ColorToARGB(c, 255), 0, 0);
   }
 
 //--- gambar ulang semua
@@ -776,6 +832,8 @@ void Render()
      }
    g_cv.Erase(0x00000000);
    g_cv.FontSet("Segoe UI", -80);
+   g_tn = 0;
+   TxtAdd(0, 560, 0, IsGold() ? 90 : 42);             // area teks status kiri atas (judul chart + EMA50/MAC/Donchian)
    DrawMac();
    DrawEma();
    DrawDon();
@@ -798,7 +856,7 @@ void Render()
          Box(r.t1, r.p1, r.p2, InpArmedColor, 0, 255, 2);
          int x, y;
          if(XY(r.t1, r.p2, x, y))
-            g_cv.TextOut(g_w - 64, y - 13, "ARMED " + r.dir + " · tunggu CHoCH M5", ColorToARGB(InpArmedColor, 255),
+            Txt(g_w - 64, y - 13, "ARMED " + r.dir + " · tunggu CHoCH M5", ColorToARGB(InpArmedColor, 255),
                          TA_RIGHT);
         }
       else if(r.rec == "CHOCH")
@@ -836,9 +894,7 @@ void Render()
          if(XY(r.t1, r.p1, x, y) && x >= 0 && x < g_w - 60)
            {
             color c = r.flag == 1 ? (buy ? InpBuyColor : InpSellColor) : InpOffColor;
-            g_cv.TextOut(x, buy ? y + 4 : y - 26, buy ? "▲" : "▼", ColorToARGB(c, 255), TA_CENTER);
-            g_cv.TextOut(x + 8, buy ? y + 6 : y - 24, "ORB " + r.dir + (r.flag == 1 ? "" : " (bias ✗)"),
-                         ColorToARGB(c, 230));
+            Mark(x, y, buy, "ORB " + r.dir + (r.flag == 1 ? "" : " (bias ✗)"), c);
            }
         }
       else if(r.rec == "ORBORD")
