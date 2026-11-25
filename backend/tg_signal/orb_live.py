@@ -9,6 +9,8 @@ Konfigurasi per instrumen (SPECS; backtest 17 Nov 2026, orb.py / orb_deep.py):
   XAUUSD : range 15 mnt setelah NY buka 09:30 America/New_York · breakout close M5 ≤ 120 mnt · harus searah
            bias EMA50 H1 (slope > 0.1 ATR14) · SL sisi seberang range ∓ $0.1 · TP 2R
            (PF 1.42 latih / 1.61 uji, DD ~6R, ~2 trade/minggu) · lot tetap 0.01 (ORB_LOT) atau ORB_RISK_USD
+           Filter (26 Nov 2026): lewati bila news HIGH USD ±120 mnt dari entry (ORB_NEWS_MIN, 0 = off;
+           kalender Forex Factory) atau entry > 1.0× lebar range di luar tepinya (ORB_MAX_EXT, 0 = off)
   ETHUSD : range 30 mnt · tanpa filter bias · SL ∓ $0.6 · TP 2R (PF 1.30 / 1.28, spread 2× masih 1.24 / 1.18,
            ~4 trade/minggu) · lot dari risiko ORB_ETHUSD_RISK_USD (default $15)
   Semua  : entry market · posisi ditutup paksa 6 jam setelah NY buka · maks 1 trade per hari ·
@@ -34,6 +36,7 @@ import pandas as pd
 
 from tg_signal import orb
 from tg_signal import settings
+from tg_signal.detectors.news_calendar import high_impact_times
 from tg_signal.executor import MT5Executor
 from tg_signal.settings import _f, _i
 
@@ -52,6 +55,8 @@ class Spec:
     risk_usd: float         # > 0 → lot dihitung dari risiko
     max_lot: float
     suffix: str             # akhiran nama file (XAUUSD: "" → nama lama tetap)
+    news_min: float = 0.0   # > 0 → lewati breakout bila news HIGH USD dalam ±news_min menit dari entry
+    max_ext: float = 0.0    # > 0 → lewati bila entry lebih jauh dari max_ext × lebar range di luar tepinya
 
     def path(self, stem: str, ext: str) -> Path:
         return settings.DATA_DIR / f"{stem}{self.suffix}{ext}"
@@ -83,7 +88,8 @@ class Spec:
 
 SPECS = {
     "XAUUSD": Spec("XAUUSD", orb.LIVE_CFG, 0.1, 1.0, _i("ORB_MAGIC", 990033), _f("ORB_LOT", 0.01),
-                   _f("ORB_RISK_USD", 0), _f("ORB_MAX_LOT", 0.05), ""),
+                   _f("ORB_RISK_USD", 0), _f("ORB_MAX_LOT", 0.05), "",
+                   _f("ORB_NEWS_MIN", 120), _f("ORB_MAX_EXT", 1.0)),
     "ETHUSD": Spec("ETHUSD", orb.Cfg("ny", 30, "bar", "market", "opp", "2", "none", "none"), 0.6, 6.0,
                    _i("ORB_ETHUSD_MAGIC", 990034), _f("ORB_ETHUSD_LOT", 0.1), _f("ORB_ETHUSD_RISK_USD", 15),
                    _f("ORB_ETHUSD_MAX_LOT", 2.0), "_ethusd"),
@@ -173,8 +179,19 @@ class OrbTrader:
         if settings.is_paused(settings.PAUSE_ORB):
             log.info("ORB %s %s: %s — dilewati (PAUSE)", sym, day, info)
             return
+        if self.spec.news_min > 0:
+            ev = orb.near_news(now, high_impact_times(), self.spec.news_min)
+            if ev is not None:
+                log.info("ORB %s %s: %s — dilewati (news HIGH USD %s WIB, filter ±%g mnt)", sym, day, info,
+                         ev.tz_convert("Asia/Jakarta").strftime("%d/%m %H:%M"), self.spec.news_min)
+                return
         tick = self.ex.tick()
         price = tick.ask if is_buy else tick.bid
+        ext = orb.entry_extension(sig, price)
+        if self.spec.max_ext > 0 and ext > self.spec.max_ext:
+            log.info("ORB %s %s: %s — dilewati (entry %.2f terlalu jauh: %.2f× lebar range > %g)", sym, day, info,
+                     price, ext, self.spec.max_ext)
+            return
         plan = orb.plan_order(sig, price, float(cfg.tp), self.spec.sl_buf, self.spec.risk_min)
         if plan is None:
             log.info("ORB %s %s: %s — risiko < %.2f, dilewati", sym, day, info, self.spec.risk_min)

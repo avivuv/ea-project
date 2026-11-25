@@ -46,3 +46,20 @@ def test_bias_uses_only_closed_h1_bar():
     last_open = h1.index[-1]
     assert orb.bias_at(b, last_open + pd.Timedelta(minutes=60), True)
     assert not orb.bias_at(b, last_open + pd.Timedelta(minutes=60), False)
+
+
+def test_entry_extension_ratio_outside_range():
+    sig = {"dir": "SELL", "or_hi": 3473.51, "or_lo": 3454.81}
+    assert abs(orb.entry_extension(sig, 3430.59) - 1.295) < 0.01        # kasus live 25 Nov 2026 → dilewati
+    assert orb.entry_extension(sig, 3457.0) == 0.0                     # masih di dalam range
+    buy = {"dir": "BUY", "or_hi": 110.0, "or_lo": 100.0}
+    assert orb.entry_extension(buy, 115.0) == 0.5
+
+
+def test_near_news_window_both_sides():
+    news = [pd.Timestamp("2026-11-25 13:30", tz="UTC")]                # 08:30 ET
+    entry = pd.Timestamp("2026-11-25 15:20", tz="UTC")                 # 110 mnt setelah news
+    assert orb.near_news(entry, news, 120) == news[0]
+    assert orb.near_news(entry, news, 60) is None
+    assert orb.near_news(pd.Timestamp("2026-11-25 11:40", tz="UTC"), news, 120) == news[0]   # sebelum news
+    assert orb.near_news(entry, [], 120) is None

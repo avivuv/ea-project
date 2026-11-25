@@ -240,3 +240,19 @@ def plan_order(sig: dict, price: float, rr: float = float(LIVE_CFG.tp), sl_buf: 
         risk = sl - price
         tp = price - rr * risk
     return None if risk < risk_min else (sl, tp, risk)
+
+
+def entry_extension(sig: dict, price: float) -> float:
+    """Jarak entry di luar tepi range dibagi lebar range (0 bila masih di dalam/di tepi).
+    Backtest XAU Jun 2025–Nov 2026: tidak pernah > 1.0 (kuantil 90% = 0.47); live 25 Nov 2026 = 1.3 → SL."""
+    width = sig["or_hi"] - sig["or_lo"]
+    ext = price - sig["or_hi"] if sig["dir"] == "BUY" else sig["or_lo"] - price
+    return max(ext, 0.0) / width if width > 0 else 0.0
+
+
+def near_news(t: pd.Timestamp, events, minutes: float):
+    """Event news terdekat dalam ±minutes dari t (UTC), atau None. Backtest 26 Nov 2026 (proxy spike M1):
+    ORB XAU skip ±120 mnt → PF latih 1.42→1.55–2.27, uji 1.61→1.93–2.85 (ETH justru memburuk)."""
+    t = pd.Timestamp(t)
+    near = [pd.Timestamp(e) for e in events if abs((pd.Timestamp(e) - t).total_seconds()) <= minutes * 60]
+    return min(near, key=lambda e: abs((e - t).total_seconds())) if near else None
